@@ -30,13 +30,20 @@ def get_unique_artists():
     return sorted(df['artist'].unique())
 
 def get_users_by_artists(selected_artists):
-    """選択されたアーティストを聴いているユーザーIDを取得"""
+    """選択されたアーティスト全てを聴いているユーザーIDを取得"""
     if not selected_artists:
         return []
     
     df = pd.read_csv('user_artist_plays.csv')
-    users = df[df['artist'].isin(selected_artists)]['user_id'].unique()
-    return sorted(users)
+    
+    # 選択されたアーティストを聴いているユーザーを取得
+    filtered_df = df[df['artist'].isin(selected_artists)]
+    
+    # ユーザーIDでグループ化して、選択したアーティスト数と一致するユーザーを抽出
+    user_artist_counts = filtered_df.groupby('user_id')['artist'].nunique()
+    users_with_all_artists = user_artist_counts[user_artist_counts == len(selected_artists)].index.tolist()
+    
+    return sorted(users_with_all_artists)
 
 def main():
     st.title("🎵 Music Recommender Demo")
@@ -89,7 +96,7 @@ def main():
             
     else:
         # アーティスト指定による検索
-        st.markdown("**アーティストを選択して、そのアーティストを聴いているユーザーから選択してください（最大3つまで）**")
+        st.markdown("**アーティストを選択して、そのアーティスト全てを聴いているユーザーから選択してください（最大10つまで）**")
         
         # アーティスト選択
         artists = get_unique_artists()
@@ -97,7 +104,7 @@ def main():
             "アーティストを選択（最大10アーティスト）:",
             artists,
             max_selections=10,
-            help="選択したアーティストを聴いているユーザーが表示されます"
+            help="選択したアーティスト全てを聴いているユーザーが表示されます"
         )
         
         if selected_artists:
@@ -105,7 +112,7 @@ def main():
             matching_users = get_users_by_artists(selected_artists)
             
             if matching_users:
-                st.info(f"選択したアーティストを聴いている{len(matching_users)}人のユーザーが見つかりました")
+                st.info(f"選択したアーティスト全てを聴いている{len(matching_users)}人のユーザーが見つかりました")
                 
                 col1, col2 = st.columns([2, 1])
                 
@@ -113,13 +120,13 @@ def main():
                     user_id = st.selectbox(
                         "ユーザーIDを選択:",
                         matching_users,
-                        help="選択したアーティストを聴いているユーザーから選択してください"
+                        help="選択したアーティスト全てを聴いているユーザーから選択してください"
                     )
                 
                 with col2:
                     get_recommendations = st.button("レコメンドを取得", type="primary")
             else:
-                st.warning("選択したアーティストを聴いているユーザーが見つかりませんでした")
+                st.warning("選択したアーティスト全てを聴いているユーザーが見つかりませんでした")
                 get_recommendations = False
         else:
             st.info("アーティストを選択してください")
