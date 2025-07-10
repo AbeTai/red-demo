@@ -9,5 +9,6 @@ dependencies = [
     "implicit>=0.7.0",
     "pandas>=2.0.0",
     "numpy>=1.24.0",
-    "scipy>=1.10.0"
+    "scipy>=1.10.0",
+    "polars>=1.31.0",
 ]

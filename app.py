@@ -1,5 +1,5 @@
 import streamlit as st
-import pandas as pd
+import polars as pl
 from recommender import MusicRecommender
 
 # ページ設定
@@ -26,22 +26,22 @@ def load_recommender(alpha):
 
 def get_unique_artists():
     """CSVファイルからユニークなアーティスト一覧を取得"""
-    df = pd.read_csv('user_artist_plays.csv')
-    return sorted(df['artist'].unique())
+    df = pl.read_csv('user_artist_plays.csv')
+    return sorted(df['artist'].unique().to_list())
 
 def get_users_by_artists(selected_artists):
     """選択されたアーティスト全てを聴いているユーザーIDを取得"""
     if not selected_artists:
         return []
     
-    df = pd.read_csv('user_artist_plays.csv')
+    df = pl.read_csv('user_artist_plays.csv')
     
     # 選択されたアーティストを聴いているユーザーを取得
-    filtered_df = df[df['artist'].isin(selected_artists)]
+    filtered_df = df.filter(pl.col('artist').is_in(selected_artists))
     
     # ユーザーIDでグループ化して、選択したアーティスト数と一致するユーザーを抽出
-    user_artist_counts = filtered_df.groupby('user_id')['artist'].nunique()
-    users_with_all_artists = user_artist_counts[user_artist_counts == len(selected_artists)].index.tolist()
+    user_artist_counts = filtered_df.group_by('user_id').agg(pl.col('artist').n_unique().alias('artist_count'))
+    users_with_all_artists = user_artist_counts.filter(pl.col('artist_count') == len(selected_artists))['user_id'].to_list()
     
     return sorted(users_with_all_artists)
 
@@ -151,11 +151,11 @@ def main():
             return
         
         if history:
-            history_df = pd.DataFrame(history, columns=["アーティスト", "再生回数"])
+            history_df = pl.DataFrame(history, schema=["アーティスト", "再生回数"])
             
             # 再生履歴をテーブルで表示
             st.dataframe(
-                history_df,
+                history_df.to_pandas(),
                 use_container_width=True,
                 hide_index=True
             )

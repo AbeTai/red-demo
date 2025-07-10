@@ -1,5 +1,5 @@
 import streamlit as st
-import pandas as pd
+import polars as pl
 from recommender import MusicRecommender
 
 # ページ設定
@@ -26,54 +26,57 @@ def load_recommender(alpha):
 
 def get_unique_artists():
     """CSVファイルからユニークなアーティスト一覧を取得"""
-    df = pd.read_csv('user_artist_plays.csv')
-    return sorted(df['artist'].unique())
+    df = pl.read_csv('user_artist_plays.csv')
+    return sorted(df['artist'].unique().to_list())
 
 def get_users_by_artists_and_demographics(selected_artists, selected_gender=None, age_range=None):
     """選択されたアーティスト全てを聴いているユーザーIDを取得（性別・年齢フィルタ付き）"""
     if not selected_artists:
         return []
     
-    df = pd.read_csv('user_artist_plays.csv')
+    df = pl.read_csv('user_artist_plays.csv')
     
     # 選択されたアーティストを聴いているユーザーを取得
-    filtered_df = df[df['artist'].isin(selected_artists)]
+    filtered_df = df.filter(pl.col('artist').is_in(selected_artists))
     
     # ユーザーIDでグループ化して、選択したアーティスト数と一致するユーザーを抽出
-    user_artist_counts = filtered_df.groupby('user_id')['artist'].nunique()
-    users_with_all_artists = user_artist_counts[user_artist_counts == len(selected_artists)].index.tolist()
+    user_artist_counts = filtered_df.group_by('user_id').agg(pl.col('artist').n_unique().alias('artist_count'))
+    users_with_all_artists = user_artist_counts.filter(pl.col('artist_count') == len(selected_artists))['user_id'].to_list()
     
     # 性別・年齢フィルタが指定されている場合は適用
     if selected_gender or age_range:
         # ユーザーごとの性別・年齢情報を取得（最初の行を使用）
-        user_demographics = df.groupby('user_id')[['gender', 'age']].first()
+        user_demographics = df.group_by('user_id').agg([
+            pl.col('gender').first().alias('gender'),
+            pl.col('age').first().alias('age')
+        ])
         
         # 性別フィルタを適用
         if selected_gender:
-            gender_filtered_users = user_demographics[user_demographics['gender'] == selected_gender].index.tolist()
+            gender_filtered_users = user_demographics.filter(pl.col('gender') == selected_gender)['user_id'].to_list()
             users_with_all_artists = [user for user in users_with_all_artists if user in gender_filtered_users]
         
-        # 年齢フィルタを適用
+        # 年齢カテゴリフィルタを適用
         if age_range:
-            min_age, max_age = age_range
-            age_filtered_users = user_demographics[
-                (user_demographics['age'] >= min_age) & 
-                (user_demographics['age'] <= max_age)
-            ].index.tolist()
+            age_filtered_users = user_demographics.filter(
+                pl.col('age') == age_range
+            )['user_id'].to_list()
             users_with_all_artists = [user for user in users_with_all_artists if user in age_filtered_users]
     
     return sorted(users_with_all_artists)
 
 def get_demographics_info():
-    """性別・年齢の情報を取得"""
-    df = pd.read_csv('user_artist_plays.csv')
-    user_demographics = df.groupby('user_id')[['gender', 'age']].first()
+    """性別・年齢カテゴリの情報を取得"""
+    df = pl.read_csv('user_artist_plays.csv')
+    user_demographics = df.group_by('user_id').agg([
+        pl.col('gender').first().alias('gender'),
+        pl.col('age').first().alias('age')
+    ])
     
-    unique_genders = sorted(user_demographics['gender'].unique())
-    min_age = int(user_demographics['age'].min())
-    max_age = int(user_demographics['age'].max())
+    unique_genders = sorted(user_demographics['gender'].unique().to_list())
+    unique_age_categories = sorted(user_demographics['age'].unique().to_list())
     
-    return unique_genders, min_age, max_age
+    return unique_genders, unique_age_categories
 
 def main():
     st.title("🎵 Music Recommender Demo (Enhanced)")
@@ -144,7 +147,7 @@ def main():
         with col1:
             # 性別フィルタ
             try:
-                unique_genders, min_age, max_age = get_demographics_info()
+                unique_genders, unique_age_categories = get_demographics_info()
                 selected_gender = st.selectbox(
                     "性別で絞り込み（任意）:",
                     ["すべて"] + unique_genders,
@@ -157,19 +160,17 @@ def main():
                 selected_gender = None
         
         with col2:
-            # 年齢フィルタ
+            # 年齢カテゴリフィルタ
             try:
-                age_filter_enabled = st.checkbox("年齢で絞り込み")
-                if age_filter_enabled:
-                    age_range = st.slider(
-                        "年齢範囲:",
-                        min_value=min_age,
-                        max_value=max_age,
-                        value=(min_age, max_age),
-                        help="指定した年齢範囲のユーザーのみに絞り込みます"
-                    )
-                else:
+                selected_age_category = st.selectbox(
+                    "年齢で絞り込み（任意）:",
+                    ["すべて"] + unique_age_categories,
+                    help="指定した年齢カテゴリのユーザーのみに絞り込みます"
+                )
+                if selected_age_category == "すべて":
                     age_range = None
+                else:
+                    age_range = selected_age_category
             except Exception as e:
                 st.warning("年齢情報を取得できませんでした。年齢フィルタは利用できません。")
                 age_range = None
@@ -188,7 +189,7 @@ def main():
                 if selected_gender:
                     filter_info.append(f"性別: {selected_gender}")
                 if age_range:
-                    filter_info.append(f"年齢: {age_range[0]}-{age_range[1]}歳")
+                    filter_info.append(f"年齢: {age_range}歳")
                 
                 if filter_info:
                     filter_text = "（" + ", ".join(filter_info) + "）"
@@ -235,11 +236,11 @@ def main():
             return
         
         if history:
-            history_df = pd.DataFrame(history, columns=["アーティスト", "再生回数"])
+            history_df = pl.DataFrame(history, schema=["アーティスト", "再生回数"])
             
             # 再生履歴をテーブルで表示
             st.dataframe(
-                history_df,
+                history_df.to_pandas(),
                 use_container_width=True,
                 hide_index=True
             )
@@ -255,14 +256,14 @@ def main():
             
             # ユーザーの性別・年齢情報を表示（データにある場合）
             try:
-                df = pd.read_csv('user_artist_plays.csv')
-                user_info = df[df['user_id'] == user_id][['gender', 'age']].iloc[0]
+                df = pl.read_csv('user_artist_plays.csv')
+                user_info = df.filter(pl.col('user_id') == user_id).select(['gender', 'age']).row(0)
                 
                 col1, col2 = st.columns(2)
                 with col1:
-                    st.metric("性別", user_info['gender'])
+                    st.metric("性別", user_info[0])
                 with col2:
-                    st.metric("年齢", f"{user_info['age']}歳")
+                    st.metric("年齢", user_info[1])
             except:
                 pass  # 性別・年齢情報がない場合は表示しない
         else:
