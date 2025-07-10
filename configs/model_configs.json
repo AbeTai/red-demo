@@ -1,0 +1,107 @@
+{
+  "matrix_factorization_models": [
+    {
+      "model_name": "MusicRecommender",
+      "model_module": "models.matrix_factorization.music_recommender",
+      "model_class": "MusicRecommender",
+      "model_params": {
+        "alpha": 0.4,
+        "factors": 50,
+        "regularization": 0.1,
+        "iterations": 20
+      },
+      "description": "基本的なALS行列因子分解による音楽推薦"
+    },
+    {
+      "model_name": "MusicRecommender",
+      "model_module": "models.matrix_factorization.music_recommender",
+      "model_class": "MusicRecommender",
+      "model_params": {
+        "alpha": 0.8,
+        "factors": 50,
+        "regularization": 0.1,
+        "iterations": 20
+      },
+      "description": "高alpha値でのALS行列因子分解による音楽推薦"
+    },
+    {
+      "model_name": "MusicRecommenderMMR",
+      "model_module": "models.matrix_factorization.music_recommender_mmr",
+      "model_class": "MusicRecommenderMMR",
+      "model_params": {
+        "alpha": 0.4,
+        "factors": 50,
+        "regularization": 0.1,
+        "iterations": 20,
+        "lambda_param": 0.5,
+        "candidate_pool_size": 20
+      },
+      "description": "MMRを使用した多様性重視のALS推薦"
+    },
+    {
+      "model_name": "MusicRecommenderMMR",
+      "model_module": "models.matrix_factorization.music_recommender_mmr",
+      "model_class": "MusicRecommenderMMR",
+      "model_params": {
+        "alpha": 0.4,
+        "factors": 50,
+        "regularization": 0.1,
+        "iterations": 20,
+        "lambda_param": 0.3,
+        "candidate_pool_size": 20
+      },
+      "description": "関連性重視のMMR設定によるALS推薦"
+    },
+    {
+      "model_name": "MusicRecommenderMMR",
+      "model_module": "models.matrix_factorization.music_recommender_mmr",
+      "model_class": "MusicRecommenderMMR",
+      "model_params": {
+        "alpha": 0.4,
+        "factors": 50,
+        "regularization": 0.1,
+        "iterations": 20,
+        "lambda_param": 0.7,
+        "candidate_pool_size": 20
+      },
+      "description": "多様性重視のMMR設定によるALS推薦"
+    }
+  ],
+  "gnn_models": [
+    {
+      "model_name": "GraphSAGE",
+      "model_module": "models.gnn.graph_sage_recommender",
+      "model_class": "GraphSAGERecommender",
+      "model_params": {
+        "embedding_dim": 64,
+        "num_layers": 2,
+        "dropout": 0.1,
+        "lr": 0.001,
+        "epochs": 100
+      },
+      "description": "GraphSAGEを使用したグラフニューラルネットワーク推薦（サンプル設定）"
+    }
+  ],
+  "deep_learning_models": [
+    {
+      "model_name": "NeuralCF",
+      "model_module": "models.deep_learning.neural_cf_recommender",
+      "model_class": "NeuralCFRecommender",
+      "model_params": {
+        "embedding_dim": 32,
+        "hidden_dims": [64, 32, 16],
+        "dropout": 0.2,
+        "lr": 0.001,
+        "epochs": 50
+      },
+      "description": "Neural Collaborative Filteringによる推薦（サンプル設定）"
+    }
+  ],
+  "default_config": {
+    "csv_path": "data/user_artist_plays.csv",
+    "results_path": "results/evaluation_results.csv",
+    "k": 5,
+    "train_ratio": 0.8,
+    "include_serendipity": true
+  }
+}

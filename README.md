@@ -1,182 +1,237 @@
-# Music Recommender Demo
+# 音楽推薦システム
 
-A comprehensive music recommendation system featuring multiple algorithms and interfaces for exploring collaborative filtering and diversified recommendations.
+協調フィルタリングとMMR（Maximal Marginal Relevance）を使用した包括的な音楽推薦システムです。
 
-## Features
+## 概要
 
-- **Collaborative Filtering**: Implicit ALS (Alternating Least Squares) algorithm
-- **MMR Reranking**: Maximal Marginal Relevance for balanced relevance-diversity recommendations
-- **Demographic Filtering**: Search by gender and age categories
-- **Multiple Interfaces**: Basic, enhanced, and MMR-enabled web applications
-- **Real-time Parameter Tuning**: Dynamic adjustment of recommendation parameters
+このプロジェクトは、以下の機能を提供する音楽推薦システムです：
 
-## Quick Start
+- **協調フィルタリング**: Implicit ALSアルゴリズムを使用した推薦
+- **MMR推薦**: 関連性と多様性のバランスを取った推薦
+- **人口統計学フィルタリング**: 性別・年齢による推薦結果のフィルタリング
+- **評価システム**: 複数の評価指標による推薦モデルの性能評価
+- **Webインターフェース**: Streamlitを使用した直感的なUI
 
-### Installation
+## ディレクトリ構成
 
-```bash
-# Clone the repository
-git clone <repository-url>
-cd red-demo
-
-# Install dependencies using uv
-uv sync
+```
+.
+├── README.md                    # このファイル
+├── data_generator.py           # サンプルデータ生成スクリプト
+├── app.py                      # メインのStreamlitアプリケーション
+├── evaluate_models.py          # モデル評価CLIツール
+├── evaluation_results.csv      # 評価結果保存ファイル
+├── user_artist_plays.csv       # ユーザー-アーティスト再生データ
+├── models/                     # 推薦モデル
+│   ├── recommender.py         # 基本ALSモデル
+│   └── recommender_mmr.py     # MMR拡張モデル
+├── src/evaluation/             # 評価系モジュール
+│   ├── metrics.py             # 評価指標
+│   ├── data_splitter.py       # 時系列データ分割
+│   ├── evaluator.py           # モデル評価
+│   └── results_manager.py     # 評価結果管理
+└── weights/                    # 訓練済みモデル保存場所
 ```
 
-### Generate Sample Data
+## 機能説明
 
-```bash
-# Create synthetic dataset with 1000 users, 20 artists, and demographics
-uv run python data_generator.py
-```
+### 1. 推薦アルゴリズム
 
-### Run Applications
+#### 標準推薦（Implicit ALS）
+- 再生回数を信頼度として使用
+- 信頼度関数: `1 + α × 再生回数`
+- αパラメータで重み付けを調整可能
 
-Choose from multiple Streamlit interfaces:
+#### MMR推薦
+- 関連性と多様性のバランスを調整
+- λパラメータ: `0 = 多様性重視, 1 = 関連性重視`
+- アーティスト埋め込みのコサイン類似度を使用
 
-```bash
-# Basic recommender
-uv run streamlit run app.py --server.port 8501
+### 2. データ構造
 
-# With demographic filtering
-uv run streamlit run app_enhanced.py --server.port 8502
-
-# With MMR reranking
-uv run streamlit run app_mmr.py --server.port 8503
-
-# Full-featured (demographics + MMR)
-uv run streamlit run app_enhanced_mmr.py --server.port 8504
-```
-
-## Applications Overview
-
-### Basic App (`app.py`)
-- User ID input or artist-based user search
-- Standard collaborative filtering recommendations
-- User listening history display
-
-### Enhanced App (`app_enhanced.py`)
-- All basic features plus:
-- Gender filtering (Male/Female/Other)
-- Age category filtering (5-year ranges: 15-19, 20-24, etc.)
-- Combined artist + demographic search
-
-### MMR Apps (`app_mmr.py`, `app_enhanced_mmr.py`)
-- Side-by-side comparison of standard vs MMR recommendations
-- Dynamic lambda parameter adjustment (0.0=diversity, 1.0=relevance)
-- Configurable candidate pool size
-- Real-time reranking with visual explanations
-
-## Command Line Interface
-
-### Basic Recommender
-
-```bash
-uv run python recommender.py --help
-
-# Examples
-uv run python recommender.py --user-id 10 --n-recommendations 5
-uv run python recommender.py --csv-path data.csv --model-dir models/
-uv run python recommender.py --alpha 0.6 --train
-```
-
-### MMR Recommender
-
-```bash
-uv run python recommender_mmr.py --help
-
-# Examples
-# Balanced recommendation
-uv run python recommender_mmr.py --user-id 10 --lambda-param 0.5
-
-# Diversity-focused
-uv run python recommender_mmr.py --user-id 10 --lambda-param 0.1
-
-# Relevance-focused  
-uv run python recommender_mmr.py --user-id 10 --lambda-param 0.9
-
-# Disable MMR (standard collaborative filtering)
-uv run python recommender_mmr.py --user-id 10 --no-mmr
-```
-
-## Algorithm Details
-
-### Implicit ALS
-- Matrix factorization for collaborative filtering
-- Confidence-based weighting: `1 + alpha * play_count`
-- Configurable alpha parameter (default: 0.4)
-
-### MMR (Maximal Marginal Relevance)
-- Balances relevance and diversity in recommendations
-- Formula: `� � relevance_score - (1-�) � max_similarity`
-- Uses cosine similarity between artist embeddings
-- Lambda parameter controls trade-off (0=diverse, 1=relevant)
-
-### Data Schema
-
-The system uses synthetic music listening data with the following structure:
-
+CSVファイルのスキーマ：
 ```csv
-user_id,artist,play_count,gender,age
-1,Taylor Swift,31,Female,25-29
-1,Drake,42,Female,25-29
-2,The Beatles,15,Male,45-49
+user_id,artist,play_count,gender,age,interaction_date,genre
+1,Taylor Swift,41,Male,25-29,20210427,Pop
 ```
 
-- **user_id**: 1-1000 unique users
-- **artist**: 20 popular artists
-- **play_count**: 1-500 plays per user-artist pair
-- **gender**: Male, Female, Other (distribution: 48%, 48%, 4%)
-- **age**: 5-year categories from 15-19 to 65-70
+- `user_id`: ユーザーID
+- `artist`: アーティスト名
+- `play_count`: 再生回数
+- `gender`: 性別（Male/Female/Other）
+- `age`: 年齢カテゴリ（5歳刻み）
+- `interaction_date`: インタラクション日付（YYYYMMDD）
+- `genre`: 音楽ジャンル
 
-## Model Persistence
+### 3. 評価指標
 
-Models are automatically saved and loaded based on parameters:
-- Standard models: `recommender_model_alpha_{alpha}.pkl`
-- MMR models: `recommender_mmr_model_alpha_{alpha}.pkl`
-- Custom model directories supported via `--model-dir`
+- **Precision@K**: 上位K件の推薦中の関連アイテム割合
+- **Recall@K**: 関連アイテム中の推薦できた割合
+- **NDCG@K**: 正規化割引累積利得
+- **Hit Rate@K**: 上位K件に関連アイテムが含まれる割合
+- **Coverage**: 推薦された全アイテムの網羅率
 
-## Performance Features
+## セットアップ
 
-- **Polars**: High-performance data processing
-- **Streamlit Caching**: Model loading optimization
-- **Sparse Matrices**: Efficient memory usage for large datasets
-- **Configurable Paths**: Flexible file organization
+### 必要パッケージのインストール
 
-## Use Cases
+```bash
+# uvを使用する場合
+uv add polars implicit scikit-learn streamlit
 
-### Research & Education
-- Compare collaborative filtering approaches
-- Study relevance vs diversity trade-offs
-- Analyze demographic bias in recommendations
+# pipを使用する場合
+pip install polars implicit scikit-learn streamlit
+```
 
-### Demo & Prototyping
-- Interactive parameter exploration
-- Side-by-side algorithm comparison
-- Real-time recommendation generation
+### サンプルデータの生成
 
-### Development & Testing
-- Command-line model training and evaluation
-- Configurable data paths and model storage
-- Extensible architecture for new algorithms
+```bash
+python data_generator.py
+```
 
-## Technical Requirements
+これにより、1000ユーザー、20アーティストの合成データが生成されます。
 
-- Python e3.13
-- Dependencies managed via `uv`
-- Web browser for Streamlit interfaces
-- ~500MB memory for default dataset
+## 使用方法
 
-## Contributing
+### 1. Webアプリケーション
 
-When extending the system:
+```bash
+streamlit run app.py
+```
 
-1. Follow the established patterns for configurable paths
-2. Use Polars for data processing efficiency
-3. Maintain backward compatibility for model loading
-4. Add command-line arguments for new parameters
-5. Update both CLI and web interfaces consistently
+機能：
+- ユーザーID直接入力
+- アーティスト選択による検索
+- 人口統計学フィルタリング
+- 標準推薦とMMR推薦の同時表示
+- MMRパラメータのリアルタイム調整
 
-## License
+### 2. モデル評価
 
-[Add your license information here]
+```bash
+# 基本評価
+python evaluate_models.py --csv-path user_artist_plays.csv --k 5
+
+# 結果表示
+python evaluate_models.py --show-summary
+python evaluate_models.py --compare-models
+python evaluate_models.py --show-best
+```
+
+#### 評価オプション
+
+- `--csv-path`: データファイルパス
+- `--k`: 評価対象推薦数（デフォルト：5）
+- `--split-date`: 分割日付（YYYYMMDD）
+- `--train-ratio`: 訓練データ比率（デフォルト：0.8）
+- `--results-path`: 結果保存パス
+
+### 3. 単体モデル実行
+
+```bash
+# 標準モデル
+python models/recommender.py --csv-path user_artist_plays.csv --user-id 1
+
+# MMRモデル  
+python models/recommender_mmr.py --csv-path user_artist_plays.csv --user-id 1 --lambda-param 0.5
+```
+
+## 評価結果の管理
+
+評価結果は`evaluation_results.csv`に自動保存されます：
+
+| data_name | model_name | execute_date | param | precision_at_5 | recall_at_5 | ... |
+|-----------|------------|-------------|-------|----------------|-------------|-----|
+| user_artist_plays | MusicRecommenderMMR | 20250711 | {"alpha": 0.4, "lambda_param": 0.7} | 0.2048 | 0.4389 | ... |
+
+- 同一設定での重複実行を自動検出
+- JSON形式でパラメータを記録
+- 日付別の実行履歴を保持
+
+## カスタマイズ
+
+### 新しい評価指標の追加
+
+`src/evaluation/metrics.py`の`EvaluationMetrics`クラスに静的メソッドを追加：
+
+```python
+@staticmethod
+def new_metric(recommended_items: List[str], relevant_items: Set[str], k: int) -> float:
+    # 新しい指標の実装
+    pass
+```
+
+### モデルの追加
+
+1. `models/`に新しいクラスを作成
+2. `evaluate_models.py`の`get_model_configs()`に設定を追加
+3. 必要に応じて`src/evaluation/evaluator.py`を更新
+
+### データソースの変更
+
+1. `data_generator.py`を修正してカスタムデータを生成
+2. または既存のCSVファイルを指定の形式に変換
+
+## パフォーマンス
+
+### 推薦結果例（user_artist_plays.csvでの評価）
+
+| Model | λ | Precision@5 | Recall@5 | NDCG@5 | Hit Rate@5 |
+|-------|---|-------------|----------|---------|-------------|
+| Standard | - | 0.2018 | 0.4301 | 0.3244 | 0.6728 |
+| MMR | 0.3 | 0.2044 | 0.4388 | 0.3307 | 0.6935 |
+| MMR | 0.5 | 0.2028 | 0.4307 | 0.3267 | 0.6843 |
+| **MMR** | **0.7** | **0.2048** | **0.4389** | **0.3289** | **0.6947** |
+
+**最適設定**: MMR with λ=0.7 が最高性能を示しています。
+
+## 開発とコントリビューション
+
+### 型チェック
+
+すべてのコードは型ヒント付きで記述されており、mypyでの型チェックが可能です：
+
+```bash
+mypy models/ src/ *.py
+```
+
+### テスト
+
+新機能追加時は対応するテストを`tests/`ディレクトリに追加してください。
+
+### コーディング規約
+
+- 日本語コメントを使用
+- 型ヒントを必須とする
+- docstringでArgs/Returnsを明記
+
+## トラブルシューティング
+
+### よくある問題
+
+1. **モジュールが見つからない**
+   ```bash
+   # パッケージが正しくインストールされているか確認
+   pip list | grep implicit
+   ```
+
+2. **メモリエラー**
+   ```bash
+   # 大規模データセットの場合、chunk処理を検討
+   # またはバッチサイズを小さくする
+   ```
+
+3. **評価結果が表示されない**
+   ```bash
+   # evaluation_results.csvが存在し、正しい形式か確認
+   head evaluation_results.csv
+   ```
+
+### パフォーマンス最適化
+
+- 大規模データセット（>100万レコード）の場合：
+  - バッチ処理の実装を検討
+  - スパースマトリックスの最適化
+  - メモリ効率的なデータ分割
+
+詳細な技術文書や追加機能については、各モジュールのdocstringを参照してください。

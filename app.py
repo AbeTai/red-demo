@@ -178,6 +178,11 @@ def main():
     
     user_id = None
     
+    # 人口統計学データの存在確認（共通）
+    has_demographics = 'gender' in df.columns and 'age' in df.columns
+    selected_gender = None
+    age_range = None
+    
     if search_method == "ID直接入力":
         # ID直接入力
         col1, col2 = st.columns([2, 1])
@@ -208,8 +213,6 @@ def main():
         )
         
         # 性別・年齢フィルタ（任意）
-        has_demographics = 'gender' in df.columns and 'age' in df.columns
-        
         if has_demographics:
             st.markdown("**追加フィルタ（任意）**")
             col1, col2 = st.columns(2)
@@ -244,9 +247,6 @@ def main():
                 except Exception as e:
                     st.warning("年齢情報を取得できませんでした。")
                     age_range = None
-        else:
-            selected_gender = None
-            age_range = None
         
         if selected_artists:
             # 該当ユーザーを取得
@@ -302,7 +302,7 @@ def main():
         st.write(f"- **信頼度関数**: 1 + {alpha} × 再生回数")
         st.write("- **MMR**: Maximal Marginal Relevance による多様性考慮リランキング")
     
-    if get_recommendations or user_id:
+    if get_recommendations:
         # ユーザーの履歴を表示
         st.subheader(f"👤 User {user_id} の再生履歴")
         
