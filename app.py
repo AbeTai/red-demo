@@ -10,19 +10,33 @@ st.set_page_config(
 )
 
 @st.cache_resource
-def load_recommender():
+def load_recommender(alpha):
     """レコメンダーを読み込み（キャッシュ）"""
     recommender = MusicRecommender()
     
     # モデルが存在しない場合は訓練
-    if not recommender.load_model():
-        with st.spinner("モデルを訓練中です..."):
+    if not recommender.load_model(alpha=alpha):
+        with st.spinner(f"モデルを訓練中です (α={alpha})..."):
             recommender.load_data()
             recommender.prepare_data()
-            recommender.train_model()
-            recommender.save_model()
+            recommender.train_model(alpha=alpha)
+            recommender.save_model(alpha=alpha)
     
     return recommender
+
+def get_unique_artists():
+    """CSVファイルからユニークなアーティスト一覧を取得"""
+    df = pd.read_csv('user_artist_plays.csv')
+    return sorted(df['artist'].unique())
+
+def get_users_by_artists(selected_artists):
+    """選択されたアーティストを聴いているユーザーIDを取得"""
+    if not selected_artists:
+        return []
+    
+    df = pd.read_csv('user_artist_plays.csv')
+    users = df[df['artist'].isin(selected_artists)]['user_id'].unique()
+    return sorted(users)
 
 def main():
     st.title("🎵 Music Recommender Demo")
@@ -31,28 +45,85 @@ def main():
     # サイドバー
     st.sidebar.header("設定")
     n_recommendations = st.sidebar.slider("レコメンド数", 1, 10, 5)
+    alpha = st.sidebar.slider(
+        "Alpha値 (信頼度パラメータ)", 
+        min_value=0.1, 
+        max_value=2.0, 
+        value=0.4, 
+        step=0.1,
+        help="再生回数に対する重み付け。大きいほど再生回数の多いアイテムを重視"
+    )
     
     # レコメンダーを読み込み
     try:
-        recommender = load_recommender()
+        recommender = load_recommender(alpha)
     except Exception as e:
         st.error(f"エラーが発生しました: {e}")
         return
     
-    # ユーザー入力
-    col1, col2 = st.columns([2, 1])
+    # ユーザー検索方法の選択
+    st.subheader("🔍 ユーザー検索")
+    search_method = st.radio(
+        "検索方法を選択してください:",
+        ["ID直接入力", "アーティスト指定検索"],
+        horizontal=True
+    )
     
-    with col1:
-        user_id = st.number_input(
-            "ユーザーID", 
-            min_value=1, 
-            max_value=1000, 
-            value=1,
-            help="1から1000までのユーザーIDを入力してください"
+    user_id = None
+    
+    if search_method == "ID直接入力":
+        # 従来のID直接入力
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            user_id = st.number_input(
+                "ユーザーID", 
+                min_value=1, 
+                max_value=1000, 
+                value=1,
+                help="1から1000までのユーザーIDを入力してください"
+            )
+        
+        with col2:
+            get_recommendations = st.button("レコメンドを取得", type="primary")
+            
+    else:
+        # アーティスト指定による検索
+        st.markdown("**アーティストを選択して、そのアーティストを聴いているユーザーから選択してください（最大3つまで）**")
+        
+        # アーティスト選択
+        artists = get_unique_artists()
+        selected_artists = st.multiselect(
+            "アーティストを選択（最大10アーティスト）:",
+            artists,
+            max_selections=10,
+            help="選択したアーティストを聴いているユーザーが表示されます"
         )
-    
-    with col2:
-        get_recommendations = st.button("レコメンドを取得", type="primary")
+        
+        if selected_artists:
+            # 該当ユーザーを取得
+            matching_users = get_users_by_artists(selected_artists)
+            
+            if matching_users:
+                st.info(f"選択したアーティストを聴いている{len(matching_users)}人のユーザーが見つかりました")
+                
+                col1, col2 = st.columns([2, 1])
+                
+                with col1:
+                    user_id = st.selectbox(
+                        "ユーザーIDを選択:",
+                        matching_users,
+                        help="選択したアーティストを聴いているユーザーから選択してください"
+                    )
+                
+                with col2:
+                    get_recommendations = st.button("レコメンドを取得", type="primary")
+            else:
+                st.warning("選択したアーティストを聴いているユーザーが見つかりませんでした")
+                get_recommendations = False
+        else:
+            st.info("アーティストを選択してください")
+            get_recommendations = False
     
     # データセット情報
     with st.expander("データセット情報"):
@@ -61,7 +132,7 @@ def main():
         st.write("- **再生記録数**: 9,913件")
         st.write("- **再生回数範囲**: 1-500回")
         st.write("- **アルゴリズム**: Implicit ALS (Alternating Least Squares)")
-        st.write("- **信頼度関数**: 1 + 0.4 × 再生回数")
+        st.write(f"- **信頼度関数**: 1 + {alpha} × 再生回数")
     
     if get_recommendations or user_id:
         # ユーザーの履歴を表示
