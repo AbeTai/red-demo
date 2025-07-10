@@ -7,7 +7,7 @@ import os
 import argparse
 
 class MusicRecommender:
-    def __init__(self, csv_path='user_artist_plays.csv', model_dir='./'):
+    def __init__(self, csv_path='user_artist_plays.csv', model_dir='weights/'):
         self.model = None
         self.user_to_idx = {}
         self.idx_to_user = {}
@@ -114,7 +114,8 @@ class MusicRecommender:
         if alpha is None:
             alpha = getattr(self, 'alpha', 0.4)
         if path is None:
-            filename = f'recommender_model_alpha_{alpha:.1f}.pkl'
+            csv_basename = os.path.splitext(os.path.basename(self.csv_path))[0]
+            filename = f'{csv_basename}_alpha_{alpha:.1f}.pkl'
             path = os.path.join(self.model_dir, filename)
             
         # ディレクトリが存在しない場合は作成
@@ -137,7 +138,8 @@ class MusicRecommender:
     def load_model(self, alpha=0.4, path=None):
         """モデルを読み込み（alpha値に基づいてファイルを選択）"""
         if path is None:
-            filename = f'recommender_model_alpha_{alpha:.1f}.pkl'
+            csv_basename = os.path.splitext(os.path.basename(self.csv_path))[0]
+            filename = f'{csv_basename}_alpha_{alpha:.1f}.pkl'
             path = os.path.join(self.model_dir, filename)
             
         if not os.path.exists(path):
@@ -163,8 +165,8 @@ def main():
     parser = argparse.ArgumentParser(description='Music Recommender System')
     parser.add_argument('--csv-path', default='user_artist_plays.csv',
                         help='Path to the CSV file containing user-artist play data (default: user_artist_plays.csv)')
-    parser.add_argument('--model-dir', default='./',
-                        help='Directory to store/load model files (default: ./)')
+    parser.add_argument('--model-dir', default='weights/',
+                        help='Directory to store/load model files (default: weights/)')
     parser.add_argument('--alpha', type=float, default=0.4,
                         help='Alpha parameter for confidence calculation (default: 0.4)')
     parser.add_argument('--user-id', type=int, default=1,

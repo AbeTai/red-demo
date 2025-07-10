@@ -14,10 +14,10 @@ This is a music recommendation system demo with multiple variants featuring diff
 uv add <package-name>
 
 # Run applications
-uv run streamlit run app.py --server.port 8501                    # Basic app
-uv run streamlit run app_enhanced.py --server.port 8502          # With demographics filtering  
-uv run streamlit run app_mmr.py --server.port 8503               # With MMR reranking
-uv run streamlit run app_enhanced_mmr.py --server.port 8504      # Full-featured app
+uv run streamlit run app.py --server.port 8501                    # Main integrated app (recommended)
+uv run streamlit run app_enhanced.py --server.port 8502          # Legacy: demographics filtering  
+uv run streamlit run app_mmr.py --server.port 8503               # Legacy: MMR reranking
+uv run streamlit run app_enhanced_mmr.py --server.port 8504      # Legacy: full-featured app
 ```
 
 ### Data Generation
@@ -29,12 +29,12 @@ uv run python data_generator.py
 ### Model Training and Testing
 ```bash
 # Train/test basic recommender
-uv run python recommender.py [--csv-path PATH] [--model-dir DIR] [--alpha 0.4]
+uv run python models/recommender.py [--csv-path PATH] [--model-dir weights/] [--alpha 0.4]
 
 # Train/test MMR recommender with various parameters
-uv run python recommender_mmr.py [OPTIONS]
+uv run python models/recommender_mmr.py [OPTIONS]
   --csv-path PATH              # Data file path
-  --model-dir DIR              # Model storage directory  
+  --model-dir weights/         # Model storage directory (default: weights/)
   --alpha FLOAT                # ALS confidence parameter
   --user-id INT                # Test user ID
   --n-recommendations INT      # Number of recommendations
@@ -53,15 +53,15 @@ uv run python recommender_mmr.py [OPTIONS]
 - `data_generator.py`: Synthetic data generation with demographics (gender: Male/Female/Other, age: 5-year categories)
 
 **Model Layer:**
-- `recommender.py`: Base MusicRecommender class using Implicit ALS
-- `recommender_mmr.py`: Extended MusicRecommenderMMR with MMR reranking capabilities
-- Model persistence in pickle format with alpha-specific naming
+- `models/recommender.py`: Base MusicRecommender class using Implicit ALS
+- `models/recommender_mmr.py`: Extended MusicRecommenderMMR with MMR reranking capabilities
+- Model persistence in `weights/` directory with CSV-name-based file naming
 
 **Frontend Layer:**
-- `app.py`: Basic Streamlit interface
-- `app_enhanced.py`: Adds demographic filtering (gender/age category)  
-- `app_mmr.py`: Adds MMR parameter controls with side-by-side comparison
-- `app_enhanced_mmr.py`: Full-featured app combining all capabilities
+- `app.py`: **Main integrated application** with all features (MMR + demographics)
+- `app_enhanced.py`: Legacy - demographic filtering only
+- `app_mmr.py`: Legacy - MMR parameter controls only  
+- `app_enhanced_mmr.py`: Legacy - full-featured version
 
 ### Data Processing Pipeline
 
@@ -74,9 +74,11 @@ uv run python recommender_mmr.py [OPTIONS]
 
 ### Key Design Patterns
 
-**Model Versioning**: Models saved with alpha parameter in filename (`recommender_model_alpha_{alpha:.1f}.pkl`)
+**Model Versioning**: Models saved with CSV basename and alpha parameter (`{csv_basename}_alpha_{alpha:.1f}.pkl`, `{csv_basename}_mmr_alpha_{alpha:.1f}.pkl`)
 
 **Configurable Paths**: All file paths (CSV, model directory) configurable via command line arguments
+
+**Organized Structure**: Models in `models/` directory, weights in `weights/` directory
 
 **MMR Algorithm**: 
 - Calculates artist similarity using learned embeddings
@@ -87,6 +89,8 @@ uv run python recommender_mmr.py [OPTIONS]
 - Streamlit caching for model loading performance
 - Side-by-side comparison views for standard vs MMR recommendations
 - Dynamic parameter adjustment with real-time results
+- **app.py as main version**: All features integrated, use for new development
+- Legacy apps preserved for reference
 
 ### Data Schema
 
@@ -111,7 +115,10 @@ Uses `uv` for dependency management. Key packages:
 ## Important Notes
 
 - Always use `uv run` prefix for Python commands in this environment
+- **Use app.py as the main application** - it contains all integrated features
 - Models are automatically cached and reused unless `--train` flag is specified
 - MMR requires higher candidate pool size than final recommendation count
 - Demographic filtering works only with generated data containing gender/age columns
+- Model files are automatically named based on CSV filename for multi-dataset support
 - Port conflicts: Use different ports (8501-8504) for running multiple Streamlit apps simultaneously
+- **Development workflow**: Create `app_test.py` for experiments, then integrate into `app.py`
