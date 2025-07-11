@@ -11,13 +11,13 @@ class TimeSeriesDataSplitter:
     def __init__(self, date_column: str = 'interaction_date') -> None:
         self.date_column: str = date_column
     
-    def split_by_date(self, df: pl.DataFrame, split_date: int) -> Tuple[pl.DataFrame, pl.DataFrame]:
+    def split_by_date(self, df: pl.DataFrame, split_date: str) -> Tuple[pl.DataFrame, pl.DataFrame]:
         """
         日付によるデータ分割
         
         Args:
             df: インタラクションデータを含むDataFrame
-            split_date: 分割基準日（YYYYMMDD形式）
+            split_date: 分割基準日（YYYY-MM-DD形式）
             
         Returns:
             (train_df, test_df)のタプル
@@ -44,7 +44,7 @@ class TimeSeriesDataSplitter:
         
         # 分割ポイントを計算
         split_index: int = int(len(date_list) * train_ratio)
-        split_date: int = date_list[split_index] if split_index < len(date_list) else date_list[-1]
+        split_date: str = date_list[split_index] if split_index < len(date_list) else date_list[-1]
         
         return self.split_by_date(df, split_date)
     
@@ -72,13 +72,13 @@ class TimeSeriesDataSplitter:
         
         return user_relevant_items
     
-    def prepare_evaluation_data(self, df: pl.DataFrame, split_date: int = None, train_ratio: float = 0.8) -> Tuple[pl.DataFrame, pl.DataFrame, Dict[int, Set[str]]]:
+    def prepare_evaluation_data(self, df: pl.DataFrame, split_date: str = None, train_ratio: float = 0.8) -> Tuple[pl.DataFrame, pl.DataFrame, Dict[int, Set[str]]]:
         """
         Prepare data for evaluation
         
         Args:
             df: Full dataset
-            split_date: Optional specific date to split on (YYYYMMDD format)
+            split_date: Optional specific date to split on (YYYY-MM-DD format)
             train_ratio: Ratio for training data if split_date not provided
             
         Returns:

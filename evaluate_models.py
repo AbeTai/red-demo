@@ -138,8 +138,8 @@ def main() -> None:
                         help='ユーザー-アーティスト再生データを含むCSVファイルパス')
     parser.add_argument('--results-path', default='results/evaluation_results.csv',
                         help='評価結果を保存するパス')
-    parser.add_argument('--split-date', type=int, default=None,
-                        help='分割日付（YYYYMMDD形式）。未指定の場合はtrain-ratioを使用')
+    parser.add_argument('--split-date', type=str, default=None,
+                        help='分割日付（YYYY-MM-DD形式）。未指定の場合はtrain-ratioを使用')
     parser.add_argument('--train-ratio', type=float, default=0.8,
                         help='訓練データの比率（デフォルト: 0.8）')
     parser.add_argument('--k', type=int, default=5,

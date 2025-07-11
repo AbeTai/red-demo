@@ -65,7 +65,7 @@ def generate_sample_data() -> pd.DataFrame:
     play_counts: List[int] = []
     genders: List[str] = []
     ages: List[str] = []
-    interaction_dates: List[int] = []
+    interaction_dates: List[str] = []
     genres: List[str] = []
     
     # インタラクション日付の範囲を設定（2020年1月1日から2024年12月31日）
@@ -88,10 +88,10 @@ def generate_sample_data() -> pd.DataFrame:
             log_plays: float = np.random.lognormal(mean=2.0, sigma=1.0)
             play_count: int = int(np.clip(log_plays, 1, 500))
             
-            # インタラクション日付を生成（YYYYMMDD形式）
+            # インタラクション日付を生成（YYYY-MM-DD形式）
             random_days: int = np.random.randint(0, (end_date - start_date).days)
             interaction_date_obj: datetime.date = start_date + datetime.timedelta(days=random_days)
-            interaction_date: int = int(interaction_date_obj.strftime('%Y%m%d'))
+            interaction_date: str = interaction_date_obj.strftime('%Y-%m-%d')
             
             # データをリストに追加
             user_ids.append(user_id)
@@ -102,19 +102,19 @@ def generate_sample_data() -> pd.DataFrame:
             interaction_dates.append(interaction_date)
             genres.append(artists_genres[artist])
     
-    # データフレームを作成
+    # データフレームを作成（新しいカラム順序で）
     df: pd.DataFrame = pd.DataFrame({
         'user_id': user_ids,
-        'artist': artist_names,
-        'play_count': play_counts,
         'gender': genders,
         'age': ages,
+        'artist': artist_names,
+        'genre': genres,
         'interaction_date': interaction_dates,
-        'genre': genres
+        'play_count': play_counts
     })
     
     # CSVファイルに保存
-    df.to_csv('user_artist_plays.csv', index=False)
+    df.to_csv('data/user_artist_plays.csv', index=False)
     print(f"{n_users}ユーザーと{n_artists}アーティストで{len(df)}件の再生記録を生成しました")
     print(f"ユーザー-アーティストあたりの平均再生回数: {df['play_count'].mean():.1f}")
     print(f"総再生回数: {df['play_count'].sum():,}")
