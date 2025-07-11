@@ -194,33 +194,47 @@ def main():
     st.title("🎵 Music Recommender Demo (Integrated)")
     st.markdown("**統合版音楽推薦システム - MMR、人口統計学フィルタリング対応**")
     
-    # セッション状態の初期化（防御的な処理）
-    if 'selected_artists' not in st.session_state or st.session_state.selected_artists is None:
+    # セッション状態の初期化（防御的な処理・Windows/Mac環境対応）
+    session_defaults = {
+        'selected_artists': [],
+        'selected_user_id': None,
+        'get_recommendations': False,
+        'matching_users': [],
+        'show_user_selection': False,
+        'debug_enabled': False
+    }
+    
+    for key, default_value in session_defaults.items():
+        if key not in st.session_state or st.session_state[key] is None:
+            st.session_state[key] = default_value
+    
+    # リストの型チェック（Windows環境での安定性向上）
+    if not isinstance(st.session_state.selected_artists, list):
         st.session_state.selected_artists = []
-    if 'selected_user_id' not in st.session_state:
-        st.session_state.selected_user_id = None
-    if 'get_recommendations' not in st.session_state:
-        st.session_state.get_recommendations = False
-    if 'matching_users' not in st.session_state or st.session_state.matching_users is None:
+    if not isinstance(st.session_state.matching_users, list):
         st.session_state.matching_users = []
-    if 'show_user_selection' not in st.session_state:
-        st.session_state.show_user_selection = False
-    
-    # デバッグ情報表示の設定
-    debug_enabled = st.checkbox("🔍 詳細デバッグ情報を表示", value=False, 
-                               help="アーティスト検索の詳細な情報を表示して問題を診断します")
-    st.session_state.debug_enabled = debug_enabled
-    
-    if debug_enabled:
-        st.write("**現在のセッション状態:**")
-        st.write(f"- selected_artists: {st.session_state.selected_artists}")
-        st.write(f"- matching_users: {len(st.session_state.matching_users) if st.session_state.matching_users else 0}人")
-        st.write(f"- show_user_selection: {st.session_state.show_user_selection}")
-        st.write(f"- selected_user_id: {st.session_state.selected_user_id}")
-        st.markdown("---")
     
     # CSVファイル選択
     csv_path = st.sidebar.text_input("CSVファイルパス", value="data/user_artist_plays.csv")
+    
+    # デバッグ情報表示の設定（サイドバーに移動）
+    st.sidebar.markdown("---")
+    st.sidebar.markdown("### 🔧 デバッグ設定")
+    
+    debug_enabled = st.sidebar.checkbox("🔍 詳細デバッグ情報を表示", 
+                                       value=st.session_state.debug_enabled,
+                                       help="アーティスト検索の詳細な情報を表示して問題を診断します",
+                                       key="debug_checkbox")
+    st.session_state.debug_enabled = debug_enabled
+    
+    if debug_enabled:
+        st.sidebar.write("**現在のセッション状態:**")
+        st.sidebar.write(f"- selected_artists: {len(st.session_state.selected_artists) if st.session_state.selected_artists else 0}個")
+        st.sidebar.write(f"- matching_users: {len(st.session_state.matching_users) if st.session_state.matching_users else 0}人")
+        st.sidebar.write(f"- show_user_selection: {st.session_state.show_user_selection}")
+        st.sidebar.write(f"- selected_user_id: {st.session_state.selected_user_id}")
+    
+    st.sidebar.markdown("---")
     
     # CSVファイルを読み込み
     try:
@@ -308,16 +322,25 @@ def main():
         # アーティスト指定による検索
         st.markdown("**アーティストを選択して、そのアーティスト全てを聴いているユーザーから選択してください**")
         
+        # アーティスト選択の状態を表示（フォーム外）
+        if st.session_state.selected_artists:
+            st.info(f"📝 現在選択中: {', '.join(st.session_state.selected_artists[:3])}{'...' if len(st.session_state.selected_artists) > 3 else ''} ({len(st.session_state.selected_artists)}個)")
+        
         # フォームを使用してアーティスト選択を安定化
         with st.form("artist_search_form"):
             # アーティスト選択
             artists = get_unique_artists(df)
+            
+            # フォーム内のデフォルト値を確実に設定
+            form_default_artists = st.session_state.selected_artists if st.session_state.selected_artists else []
+            
             selected_artists = st.multiselect(
                 "アーティストを選択:",
                 artists,
-                default=st.session_state.selected_artists,
+                default=form_default_artists,
                 max_selections=10,
-                help="選択したアーティスト全てを聴いているユーザーが表示されます"
+                help="選択したアーティスト全てを聴いているユーザーが表示されます",
+                key="form_artist_selector"
             )
             
             # 性別・年齢フィルタ（任意）
@@ -359,8 +382,21 @@ def main():
                         st.warning("年齢情報を取得できませんでした。")
                         age_range = None
             
-            # 検索ボタン
-            search_submitted = st.form_submit_button("🔍 ユーザーを検索", type="primary")
+            # 検索ボタンとリセットボタン
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                search_submitted = st.form_submit_button("🔍 ユーザーを検索", type="primary")
+            with col2:
+                reset_submitted = st.form_submit_button("🔄 リセット")
+        
+        # リセットボタンが押された場合
+        if reset_submitted:
+            st.session_state.selected_artists = []
+            st.session_state.selected_user_id = None
+            st.session_state.matching_users = []
+            st.session_state.show_user_selection = False
+            st.success("🔄 アーティスト選択をリセットしました")
+            st.rerun()
         
         # フォームが送信された場合のみ状態を更新
         if search_submitted:
@@ -368,14 +404,23 @@ def main():
             if selected_artists is None:
                 selected_artists = []
             
-            # 選択されたアーティストをセッション状態に保存
-            st.session_state.selected_artists = selected_artists
-            st.session_state.selected_user_id = None  # アーティスト変更時はユーザー選択をリセット
+            # アーティスト選択に変更があった場合のみセッション状態を更新
+            artists_changed = (selected_artists != st.session_state.selected_artists)
             
-            # デバッグ情報（Windows環境確認用）
-            st.write(f"🔍 検索実行: {len(selected_artists)}個のアーティストを選択")
+            # 選択されたアーティストをセッション状態に保存
+            st.session_state.selected_artists = list(selected_artists)  # リストのコピーを作成
+            
+            if artists_changed:
+                st.session_state.selected_user_id = None  # アーティスト変更時はユーザー選択をリセット
+                st.session_state.matching_users = []  # マッチングユーザーもリセット
+                st.session_state.show_user_selection = False
+            
+            # 検索実行の表示
+            st.success(f"🔍 検索実行: {len(selected_artists)}個のアーティストを選択")
             if selected_artists:
-                st.write(f"📝 選択されたアーティスト: {', '.join(selected_artists[:3])}{'...' if len(selected_artists) > 3 else ''}")
+                with st.expander("選択されたアーティスト", expanded=False):
+                    for i, artist in enumerate(selected_artists, 1):
+                        st.write(f"{i}. {artist}")
             
             if selected_artists and len(selected_artists) > 0:
                 try:
