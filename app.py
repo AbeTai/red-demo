@@ -132,6 +132,10 @@ def main():
         st.session_state.selected_user_id = None
     if 'get_recommendations' not in st.session_state:
         st.session_state.get_recommendations = False
+    if 'matching_users' not in st.session_state:
+        st.session_state.matching_users = []
+    if 'show_user_selection' not in st.session_state:
+        st.session_state.show_user_selection = False
     
     # CSVファイル選択
     csv_path = st.sidebar.text_input("CSVファイルパス", value="data/user_artist_plays.csv")
@@ -237,6 +241,8 @@ def main():
         if selected_artists != st.session_state.selected_artists:
             st.session_state.selected_artists = selected_artists
             st.session_state.selected_user_id = None  # アーティスト変更時はユーザー選択をリセット
+            st.session_state.matching_users = []  # マッチングユーザーもリセット
+            st.session_state.show_user_selection = False  # ユーザー選択表示をリセット
         
         # 性別・年齢フィルタ（任意）
         if has_demographics:
@@ -250,7 +256,8 @@ def main():
                     selected_gender = st.selectbox(
                         "性別で絞り込み（任意）:",
                         ["すべて"] + unique_genders,
-                        help="特定の性別のユーザーのみに絞り込みます"
+                        help="特定の性別のユーザーのみに絞り込みます",
+                        key="gender_selector"
                     )
                     if selected_gender == "すべて":
                         selected_gender = None
@@ -264,7 +271,8 @@ def main():
                     selected_age_category = st.selectbox(
                         "年齢で絞り込み（任意）:",
                         ["すべて"] + unique_age_categories,
-                        help="指定した年齢カテゴリのユーザーのみに絞り込みます"
+                        help="指定した年齢カテゴリのユーザーのみに絞り込みます",
+                        key="age_selector"
                     )
                     if selected_age_category == "すべて":
                         age_range = None
@@ -283,7 +291,18 @@ def main():
             else:
                 matching_users = get_users_by_artists(df, selected_artists)
             
-            if matching_users:
+            # マッチングユーザーをセッション状態に保存
+            if matching_users != st.session_state.matching_users:
+                st.session_state.matching_users = matching_users
+                st.session_state.show_user_selection = len(matching_users) > 0
+                if len(matching_users) > 0:
+                    if st.session_state.selected_user_id is None or st.session_state.selected_user_id not in matching_users:
+                        st.session_state.selected_user_id = matching_users[0]  # デフォルト選択
+                else:
+                    st.session_state.selected_user_id = None
+            
+            # ユーザー選択を表示するかどうかを確認
+            if st.session_state.show_user_selection and st.session_state.matching_users:
                 # フィルタ情報を表示
                 filter_info = []
                 if selected_gender:
@@ -296,19 +315,19 @@ def main():
                 else:
                     filter_text = ""
                 
-                st.info(f"選択したアーティスト全てを聴いている{len(matching_users)}人のユーザーが見つかりました{filter_text}")
+                st.info(f"選択したアーティスト全てを聴いている{len(st.session_state.matching_users)}人のユーザーが見つかりました{filter_text}")
                 
                 col1, col2 = st.columns([2, 1])
                 
                 with col1:
                     # デフォルト値の設定
                     default_index = 0
-                    if st.session_state.selected_user_id and st.session_state.selected_user_id in matching_users:
-                        default_index = matching_users.index(st.session_state.selected_user_id)
+                    if st.session_state.selected_user_id and st.session_state.selected_user_id in st.session_state.matching_users:
+                        default_index = st.session_state.matching_users.index(st.session_state.selected_user_id)
                     
                     user_id = st.selectbox(
                         "ユーザーIDを選択:",
-                        matching_users,
+                        st.session_state.matching_users,
                         index=default_index,
                         help="選択したアーティスト全てを聴いているユーザーから選択してください",
                         key="user_selector"
@@ -320,8 +339,10 @@ def main():
                 
                 with col2:
                     get_recommendations = st.button("レコメンドを取得", type="primary")
-            else:
+            elif selected_artists and not st.session_state.matching_users:
                 st.warning("指定した条件に該当するユーザーが見つかりませんでした")
+                get_recommendations = False
+            else:
                 get_recommendations = False
         else:
             st.info("アーティストを選択してください")
