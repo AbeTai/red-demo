@@ -35,11 +35,11 @@ def load_recommender(alpha, csv_path):
 
 def get_user_ids(df):
     """DataFrameから実際のユーザーID一覧を取得"""
-    return sorted(df['user_id'].unique().to_list())
+    return df['user_id'].unique().to_list()
 
 def get_unique_artists(df):
     """DataFrameからユニークなアーティスト一覧を取得"""
-    return sorted(df['artist'].unique().to_list())
+    return df['artist'].unique().to_list()
 
 def get_users_by_artists(df, selected_artists):
     """選択されたアーティスト全てを聴いているユーザーIDを取得"""
@@ -53,7 +53,7 @@ def get_users_by_artists(df, selected_artists):
     user_artist_counts = filtered_df.group_by('user_id').agg(pl.col('artist').n_unique().alias('artist_count'))
     users_with_all_artists = user_artist_counts.filter(pl.col('artist_count') == len(selected_artists))['user_id'].to_list()
     
-    return sorted(users_with_all_artists)
+    return users_with_all_artists
 
 def get_users_by_artists_and_demographics(df, selected_artists, selected_gender=None, age_range=None):
     """選択されたアーティスト全てを聴いているユーザーIDを取得（性別・年齢フィルタ付き）"""
@@ -87,7 +87,7 @@ def get_users_by_artists_and_demographics(df, selected_artists, selected_gender=
             )['user_id'].to_list()
             users_with_all_artists = [user for user in users_with_all_artists if user in age_filtered_users]
     
-    return sorted(users_with_all_artists)
+    return users_with_all_artists
 
 def get_demographics_info(df):
     """性別・年齢カテゴリの情報を取得"""
@@ -96,8 +96,8 @@ def get_demographics_info(df):
         pl.col('age').first().alias('age')
     ])
     
-    unique_genders = sorted(user_demographics['gender'].unique().to_list())
-    unique_age_categories = sorted(user_demographics['age'].unique().to_list())
+    unique_genders = user_demographics['gender'].unique().to_list()
+    unique_age_categories = user_demographics['age'].unique().to_list()
     
     return unique_genders, unique_age_categories
 
@@ -139,9 +139,8 @@ def main():
         st.sidebar.error(f"CSVファイルエラー: {e}")
         return
     
-    # ユーザーID範囲を取得
+    # ユーザーID一覧を取得
     user_ids = get_user_ids(df)
-    min_user_id, max_user_id = min(user_ids), max(user_ids)
     
     # サイドバー設定
     st.sidebar.header("アルゴリズム設定")
@@ -200,12 +199,10 @@ def main():
         col1, col2 = st.columns([2, 1])
         
         with col1:
-            user_id = st.number_input(
+            user_id = st.selectbox(
                 "ユーザーID", 
-                min_value=min_user_id, 
-                max_value=max_user_id, 
-                value=min_user_id,
-                help=f"{min_user_id}から{max_user_id}までのユーザーIDを入力してください"
+                user_ids,
+                help="レコメンドを取得したいユーザーIDを選択してください"
             )
         
         with col2:
