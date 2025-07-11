@@ -41,31 +41,87 @@ def get_unique_artists(df):
     """DataFrameからユニークなアーティスト一覧を取得"""
     return df['artist'].unique().to_list()
 
-def get_users_by_artists(df, selected_artists):
+def get_users_by_artists(df, selected_artists, debug_mode=False):
     """選択されたアーティスト全てを聴いているユーザーIDを取得"""
     if not selected_artists:
-        return []
+        return [], {} if debug_mode else []
+    
+    debug_info = {}
+    
+    if debug_mode:
+        # デバッグ情報: 選択されたアーティスト
+        debug_info['selected_artists'] = selected_artists
+        debug_info['selected_count'] = len(selected_artists)
+        
+        # データ内の全アーティスト一覧（最初の20件）
+        all_artists = df['artist'].unique().to_list()
+        debug_info['total_artists_in_data'] = len(all_artists)
+        debug_info['sample_artists'] = all_artists[:20]
+        
+        # 選択されたアーティストがデータに存在するかチェック
+        existing_artists = [artist for artist in selected_artists if artist in all_artists]
+        missing_artists = [artist for artist in selected_artists if artist not in all_artists]
+        debug_info['existing_artists'] = existing_artists
+        debug_info['missing_artists'] = missing_artists
+    
+    # アーティスト名の正規化（前後の空白を除去）
+    normalized_selected = [artist.strip() for artist in selected_artists]
     
     # 選択されたアーティストを聴いているユーザーを取得
-    filtered_df = df.filter(pl.col('artist').is_in(selected_artists))
+    filtered_df = df.filter(pl.col('artist').is_in(normalized_selected))
+    
+    if debug_mode:
+        debug_info['normalized_selected'] = normalized_selected
+        debug_info['filtered_records'] = len(filtered_df)
+        if len(filtered_df) > 0:
+            debug_info['found_artists'] = filtered_df['artist'].unique().to_list()
+        else:
+            debug_info['found_artists'] = []
     
     # ユーザーIDでグループ化して、選択したアーティスト数と一致するユーザーを抽出
     user_artist_counts = filtered_df.group_by('user_id').agg(pl.col('artist').n_unique().alias('artist_count'))
+    
+    if debug_mode:
+        debug_info['user_artist_counts'] = len(user_artist_counts)
+        if len(user_artist_counts) > 0:
+            debug_info['sample_user_counts'] = user_artist_counts.head(10).to_dicts()
+    
     users_with_all_artists = user_artist_counts.filter(pl.col('artist_count') == len(selected_artists))['user_id'].to_list()
+    
+    if debug_mode:
+        debug_info['final_users'] = users_with_all_artists
+        debug_info['final_count'] = len(users_with_all_artists)
+        return users_with_all_artists, debug_info
     
     return users_with_all_artists
 
-def get_users_by_artists_and_demographics(df, selected_artists, selected_gender=None, age_range=None):
+def get_users_by_artists_and_demographics(df, selected_artists, selected_gender=None, age_range=None, debug_mode=False):
     """選択されたアーティスト全てを聴いているユーザーIDを取得（性別・年齢フィルタ付き）"""
     if not selected_artists:
-        return []
+        return [], {} if debug_mode else []
+    
+    debug_info = {}
+    
+    # アーティスト名の正規化（前後の空白を除去）
+    normalized_selected = [artist.strip() for artist in selected_artists]
     
     # 選択されたアーティストを聴いているユーザーを取得
-    filtered_df = df.filter(pl.col('artist').is_in(selected_artists))
+    filtered_df = df.filter(pl.col('artist').is_in(normalized_selected))
+    
+    if debug_mode:
+        debug_info['normalized_artists'] = normalized_selected
+        debug_info['filtered_records'] = len(filtered_df)
+        if len(filtered_df) > 0:
+            debug_info['found_artists'] = filtered_df['artist'].unique().to_list()
+        else:
+            debug_info['found_artists'] = []
     
     # ユーザーIDでグループ化して、選択したアーティスト数と一致するユーザーを抽出
     user_artist_counts = filtered_df.group_by('user_id').agg(pl.col('artist').n_unique().alias('artist_count'))
     users_with_all_artists = user_artist_counts.filter(pl.col('artist_count') == len(selected_artists))['user_id'].to_list()
+    
+    if debug_mode:
+        debug_info['users_before_demographics'] = len(users_with_all_artists)
     
     # 性別・年齢フィルタが指定されている場合は適用
     if selected_gender or age_range:
@@ -79,6 +135,10 @@ def get_users_by_artists_and_demographics(df, selected_artists, selected_gender=
         if selected_gender:
             gender_filtered_users = user_demographics.filter(pl.col('gender') == selected_gender)['user_id'].to_list()
             users_with_all_artists = [user for user in users_with_all_artists if user in gender_filtered_users]
+            
+            if debug_mode:
+                debug_info['gender_filter'] = selected_gender
+                debug_info['users_after_gender'] = len(users_with_all_artists)
         
         # 年齢カテゴリフィルタを適用
         if age_range:
@@ -86,6 +146,15 @@ def get_users_by_artists_and_demographics(df, selected_artists, selected_gender=
                 pl.col('age') == age_range
             )['user_id'].to_list()
             users_with_all_artists = [user for user in users_with_all_artists if user in age_filtered_users]
+            
+            if debug_mode:
+                debug_info['age_filter'] = age_range
+                debug_info['users_after_age'] = len(users_with_all_artists)
+    
+    if debug_mode:
+        debug_info['final_users'] = users_with_all_artists
+        debug_info['final_count'] = len(users_with_all_artists)
+        return users_with_all_artists, debug_info
     
     return users_with_all_artists
 
@@ -137,9 +206,13 @@ def main():
     if 'show_user_selection' not in st.session_state:
         st.session_state.show_user_selection = False
     
-    # Windows環境用のデバッグ情報
-    if st.checkbox("🔍 デバッグ情報を表示 (Windows環境確認用)", value=False):
-        st.write("**セッション状態:**")
+    # デバッグ情報表示の設定
+    debug_enabled = st.checkbox("🔍 詳細デバッグ情報を表示", value=False, 
+                               help="アーティスト検索の詳細な情報を表示して問題を診断します")
+    st.session_state.debug_enabled = debug_enabled
+    
+    if debug_enabled:
+        st.write("**現在のセッション状態:**")
         st.write(f"- selected_artists: {st.session_state.selected_artists}")
         st.write(f"- matching_users: {len(st.session_state.matching_users) if st.session_state.matching_users else 0}人")
         st.write(f"- show_user_selection: {st.session_state.show_user_selection}")
@@ -306,13 +379,66 @@ def main():
             
             if selected_artists and len(selected_artists) > 0:
                 try:
+                    # デバッグモードかどうかを確認
+                    debug_enabled = st.session_state.get('debug_enabled', False)
+                    
                     # 該当ユーザーを取得
                     if has_demographics:
-                        matching_users = get_users_by_artists_and_demographics(
-                            df, selected_artists, selected_gender, age_range
+                        result = get_users_by_artists_and_demographics(
+                            df, selected_artists, selected_gender, age_range, debug_mode=debug_enabled
                         )
+                        if debug_enabled:
+                            matching_users, debug_info = result
+                        else:
+                            matching_users = result
                     else:
-                        matching_users = get_users_by_artists(df, selected_artists)
+                        result = get_users_by_artists(df, selected_artists, debug_mode=debug_enabled)
+                        if debug_enabled:
+                            matching_users, debug_info = result
+                        else:
+                            matching_users = result
+                    
+                    # デバッグ情報を表示
+                    if debug_enabled and 'debug_info' in locals():
+                        st.markdown("### 🔍 詳細デバッグ情報")
+                        
+                        with st.expander("検索プロセスの詳細", expanded=True):
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                st.markdown("**選択されたアーティスト:**")
+                                for i, artist in enumerate(debug_info.get('selected_artists', []), 1):
+                                    st.write(f"{i}. `{artist}`")
+                                
+                                if 'existing_artists' in debug_info:
+                                    st.markdown("**データに存在するアーティスト:**")
+                                    for artist in debug_info['existing_artists']:
+                                        st.write(f"✅ `{artist}`")
+                                    
+                                    if debug_info['missing_artists']:
+                                        st.markdown("**データに存在しないアーティスト:**")
+                                        for artist in debug_info['missing_artists']:
+                                            st.write(f"❌ `{artist}`")
+                            
+                            with col2:
+                                st.markdown("**検索ステップ:**")
+                                st.write(f"📊 データ内の総アーティスト数: {debug_info.get('total_artists_in_data', 'N/A')}")
+                                st.write(f"🔍 フィルタされたレコード数: {debug_info.get('filtered_records', 'N/A')}")
+                                st.write(f"👥 ユーザー・アーティスト組み合わせ数: {debug_info.get('user_artist_counts', 'N/A')}")
+                                
+                                if 'users_before_demographics' in debug_info:
+                                    st.write(f"🏃 人口統計フィルタ前: {debug_info['users_before_demographics']}人")
+                                    if 'users_after_gender' in debug_info:
+                                        st.write(f"👫 性別フィルタ後: {debug_info['users_after_gender']}人")
+                                    if 'users_after_age' in debug_info:
+                                        st.write(f"🎂 年齢フィルタ後: {debug_info['users_after_age']}人")
+                                
+                                st.write(f"✅ 最終結果: {debug_info.get('final_count', 'N/A')}人")
+                            
+                            if debug_info.get('sample_artists'):
+                                st.markdown("**データ内のアーティスト例（最初の20件）:**")
+                                artists_text = ", ".join([f"`{artist}`" for artist in debug_info['sample_artists']])
+                                st.write(artists_text)
                     
                     # 防御的な処理: matching_usersが有効かチェック
                     if matching_users is None:
