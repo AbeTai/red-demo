@@ -125,6 +125,14 @@ def main():
     st.title("🎵 Music Recommender Demo (Integrated)")
     st.markdown("**統合版音楽推薦システム - MMR、人口統計学フィルタリング対応**")
     
+    # セッション状態の初期化
+    if 'selected_artists' not in st.session_state:
+        st.session_state.selected_artists = []
+    if 'selected_user_id' not in st.session_state:
+        st.session_state.selected_user_id = None
+    if 'get_recommendations' not in st.session_state:
+        st.session_state.get_recommendations = False
+    
     # CSVファイル選択
     csv_path = st.sidebar.text_input("CSVファイルパス", value="data/user_artist_plays.csv")
     
@@ -188,6 +196,7 @@ def main():
     )
     
     user_id = None
+    get_recommendations = False
     
     # 人口統計学データの存在確認（共通）
     has_demographics = 'gender' in df.columns and 'age' in df.columns
@@ -202,7 +211,8 @@ def main():
             user_id = st.selectbox(
                 "ユーザーID", 
                 user_ids,
-                help="レコメンドを取得したいユーザーIDを選択してください"
+                help="レコメンドを取得したいユーザーIDを選択してください",
+                key="direct_user_selector"
             )
         
         with col2:
@@ -217,9 +227,16 @@ def main():
         selected_artists = st.multiselect(
             "アーティストを選択:",
             artists,
+            default=st.session_state.selected_artists,
             max_selections=10,
-            help="選択したアーティスト全てを聴いているユーザーが表示されます"
+            help="選択したアーティスト全てを聴いているユーザーが表示されます",
+            key="artist_selector"
         )
+        
+        # 選択されたアーティストをセッション状態に保存
+        if selected_artists != st.session_state.selected_artists:
+            st.session_state.selected_artists = selected_artists
+            st.session_state.selected_user_id = None  # アーティスト変更時はユーザー選択をリセット
         
         # 性別・年齢フィルタ（任意）
         if has_demographics:
@@ -284,11 +301,22 @@ def main():
                 col1, col2 = st.columns([2, 1])
                 
                 with col1:
+                    # デフォルト値の設定
+                    default_index = 0
+                    if st.session_state.selected_user_id and st.session_state.selected_user_id in matching_users:
+                        default_index = matching_users.index(st.session_state.selected_user_id)
+                    
                     user_id = st.selectbox(
                         "ユーザーIDを選択:",
                         matching_users,
-                        help="選択したアーティスト全てを聴いているユーザーから選択してください"
+                        index=default_index,
+                        help="選択したアーティスト全てを聴いているユーザーから選択してください",
+                        key="user_selector"
                     )
+                    
+                    # 選択されたユーザーIDをセッション状態に保存
+                    if user_id != st.session_state.selected_user_id:
+                        st.session_state.selected_user_id = user_id
                 
                 with col2:
                     get_recommendations = st.button("レコメンドを取得", type="primary")
