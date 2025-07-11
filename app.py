@@ -20,6 +20,16 @@ def on_search_button_click():
     """検索ボタンクリック時のコールバック関数"""
     st.session_state.search_triggered = True
 
+def on_gender_change():
+    """性別選択変更時のコールバック関数"""
+    if 'gender_selectbox' in st.session_state:
+        st.session_state.selected_gender = st.session_state.gender_selectbox
+
+def on_age_change():
+    """年齢選択変更時のコールバック関数"""
+    if 'age_selectbox' in st.session_state:
+        st.session_state.selected_age = st.session_state.age_selectbox
+
 # ページ設定
 st.set_page_config(
     page_title="Music Recommender Demo (Integrated)",
@@ -155,7 +165,9 @@ def main():
         'get_recommendations': False,
         'matching_users': [],
         'show_user_selection': False,
-        'search_triggered': False
+        'search_triggered': False,
+        'selected_gender': 'すべて',
+        'selected_age': 'すべて'
     }
     
     for key, default_value in session_defaults.items():
@@ -280,45 +292,59 @@ def main():
         )
         
         # 性別・年齢フィルタ（任意）
-        selected_gender = None
-        age_range = None
-        
         if has_demographics:
             st.markdown("**追加フィルタ（任意）**")
+            
+            # 現在の選択状態を表示
+            current_filters = []
+            if st.session_state.selected_gender != 'すべて':
+                current_filters.append(f"性別: {st.session_state.selected_gender}")
+            if st.session_state.selected_age != 'すべて':
+                current_filters.append(f"年齢: {st.session_state.selected_age}")
+            
+            if current_filters:
+                st.info(f"🔍 適用中フィルタ: {', '.join(current_filters)}")
+            
             col1, col2 = st.columns(2)
             
             with col1:
                 # 性別フィルタ
                 try:
                     unique_genders, unique_age_categories = get_demographics_info(df)
-                    selected_gender = st.selectbox(
+                    gender_options = ["すべて"] + unique_genders
+                    gender_index = 0
+                    if st.session_state.selected_gender in gender_options:
+                        gender_index = gender_options.index(st.session_state.selected_gender)
+                    
+                    selected_gender_widget = st.selectbox(
                         "性別で絞り込み（任意）:",
-                        ["すべて"] + unique_genders,
+                        gender_options,
+                        index=gender_index,
                         help="特定の性別のユーザーのみに絞り込みます",
-                        key="gender_filter"
+                        key="gender_selectbox",
+                        on_change=on_gender_change
                     )
-                    if selected_gender == "すべて":
-                        selected_gender = None
                 except Exception as e:
                     st.warning("性別情報を取得できませんでした。")
-                    selected_gender = None
             
             with col2:
                 # 年齢カテゴリフィルタ
                 try:
-                    selected_age_category = st.selectbox(
+                    age_options = ["すべて"] + unique_age_categories
+                    age_index = 0
+                    if st.session_state.selected_age in age_options:
+                        age_index = age_options.index(st.session_state.selected_age)
+                    
+                    selected_age_widget = st.selectbox(
                         "年齢で絞り込み（任意）:",
-                        ["すべて"] + unique_age_categories,
+                        age_options,
+                        index=age_index,
                         help="指定した年齢カテゴリのユーザーのみに絞り込みます",
-                        key="age_filter"
+                        key="age_selectbox",
+                        on_change=on_age_change
                     )
-                    if selected_age_category == "すべて":
-                        age_range = None
-                    else:
-                        age_range = selected_age_category
                 except Exception as e:
                     st.warning("年齢情報を取得できませんでした。")
-                    age_range = None
         
         # 検索ボタンとリセットボタン
         col1, col2 = st.columns([3, 1])
@@ -335,6 +361,8 @@ def main():
                 st.session_state.matching_users = []
                 st.session_state.show_user_selection = False
                 st.session_state.search_triggered = False
+                st.session_state.selected_gender = 'すべて'
+                st.session_state.selected_age = 'すべて'
                 st.rerun()
         
         # 検索が実行された場合
@@ -354,6 +382,10 @@ def main():
             
             if current_artists and len(current_artists) > 0:
                 try:
+                    # セッション状態から性別・年齢フィルタを取得
+                    selected_gender = st.session_state.selected_gender if st.session_state.selected_gender != 'すべて' else None
+                    age_range = st.session_state.selected_age if st.session_state.selected_age != 'すべて' else None
+                    
                     # 該当ユーザーを取得
                     if has_demographics:
                         matching_users = get_users_by_artists_and_demographics(
