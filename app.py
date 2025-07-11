@@ -1,6 +1,7 @@
 import streamlit as st
 import polars as pl
-from models.recommender_mmr import MusicRecommenderMMR
+import os
+from models.matrix_factorization.music_recommender_mmr import MusicRecommenderMMR
 
 # ページ設定
 st.set_page_config(
@@ -14,13 +15,21 @@ def load_recommender(alpha, csv_path):
     """レコメンダーを読み込み（キャッシュ）"""
     recommender = MusicRecommenderMMR(csv_path=csv_path)
     
-    # モデルが存在しない場合は訓練
-    if not recommender.load_model(alpha=alpha):
+    # モデルファイルパスを生成
+    csv_basename = os.path.splitext(os.path.basename(csv_path))[0]
+    model_filename = f'{csv_basename}_mmr_alpha_{alpha:.1f}.pkl'
+    model_path = os.path.join('weights', model_filename)
+    
+    # モデルが存在する場合は読み込み
+    try:
+        recommender.load_model(model_path)
+    except FileNotFoundError:
+        # モデルが存在しない場合は訓練
         with st.spinner(f"モデルを訓練中です (α={alpha})..."):
             recommender.load_data()
             recommender.prepare_data()
             recommender.train_model(alpha=alpha)
-            recommender.save_model(alpha=alpha)
+            recommender.save_model(model_path)
     
     return recommender
 
@@ -117,10 +126,13 @@ def main():
     st.markdown("**統合版音楽推薦システム - MMR、人口統計学フィルタリング対応**")
     
     # CSVファイル選択
-    csv_path = st.sidebar.text_input("CSVファイルパス", value="user_artist_plays.csv")
+    csv_path = st.sidebar.text_input("CSVファイルパス", value="data/user_artist_plays.csv")
     
     # CSVファイルを読み込み
     try:
+        if not os.path.exists(csv_path):
+            st.sidebar.error(f"CSVファイルが見つかりません: {csv_path}")
+            return
         df = pl.read_csv(csv_path)
         st.sidebar.success(f"データ読み込み成功: {len(df)}件")
     except Exception as e:
