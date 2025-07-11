@@ -3,13 +3,13 @@ name = "red-demo"
 version = "0.1.0"
 description = "Add your description here"
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = "==3.9.13"
 dependencies = [
-    "streamlit>=1.28.0",
-    "implicit>=0.7.0",
-    "pandas>=2.0.0",
-    "numpy>=1.24.0",
-    "scipy>=1.10.0",
-    "polars>=1.31.0",
-    "scikit-learn>=1.7.0",
+    "streamlit==1.46.1",
+    "implicit==0.7.2",
+    "pandas==1.4.1",
+    "numpy==1.24.4",
+    "scipy==1.8.0",
+    "polars==1.30.0",
+    "scikit-learn==1.0.2",
 ]
