@@ -199,13 +199,20 @@ class MusicRecommenderMMR(BaseRecommender):
         return selected
     
     def get_artist_similarity_matrix(self) -> np.ndarray:
-        """アーティスト間の類似度行列を計算"""
+        """アーティスト間の類似度行列を計算（キャッシュ機能付き）"""
         if not self.is_trained or self.model is None:
             raise ValueError("モデルが訓練されていません")
+        
+        # キャッシュがある場合は再利用
+        if hasattr(self, '_similarity_matrix_cache'):
+            return self._similarity_matrix_cache
         
         # アーティストの埋め込みベクトルを使用して類似度を計算
         artist_embeddings = self.model.item_factors
         similarity_matrix = cosine_similarity(artist_embeddings)
+        
+        # 結果をキャッシュ
+        self._similarity_matrix_cache = similarity_matrix
         return similarity_matrix
     
     def get_recommendations(
@@ -278,7 +285,6 @@ class MusicRecommenderMMR(BaseRecommender):
                 # 候補数が推薦数以下の場合はそのまま返す
                 final_recommendations = candidates
             else:
-                print(f"MMRリランキング (λ={lambda_param}) を{len(candidates)}件の候補に適用中...")
                 similarity_matrix = self.get_artist_similarity_matrix()
                 final_recommendations = self.mmr_rerank(
                     candidates, similarity_matrix, lambda_param, n_recommendations
