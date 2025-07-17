@@ -139,8 +139,7 @@ def get_demographics_info(df):
 def get_user_based_recommendation_reason(
     recommender: UserBasedRecommender, 
     user_id: int,
-    n_similar_users: int = 5,
-    min_similarity_threshold: float = 0.1
+    n_similar_users: int = 5
 ) -> Tuple[Optional[Tuple[int, float]], List[Tuple[str, int, int]]]:
     """
     ユーザーベース推薦の理由を取得する関数
@@ -149,7 +148,6 @@ def get_user_based_recommendation_reason(
         recommender: ユーザーベース推薦システムモデル
         user_id: 対象ユーザーID
         n_similar_users: 類似ユーザー数
-        min_similarity_threshold: 最小類似度閾値
     
     Returns:
         最類似ユーザー情報 (user_id, similarity) と共通アーティスト情報のタプル
@@ -158,7 +156,7 @@ def get_user_based_recommendation_reason(
         return None, []
     
     # 最も類似度の高いユーザーを取得
-    similar_users = recommender.get_similar_users(user_id, n_similar_users, min_similarity_threshold)
+    similar_users = recommender.get_similar_users(user_id, n_similar_users)
     
     if not similar_users:
         return None, []
@@ -272,14 +270,6 @@ def main():
         max_value=50,
         value=10,
         help="推薦に使用する類似ユーザーの数"
-    )
-    min_similarity_threshold = st.sidebar.slider(
-        "最小類似度閾値",
-        min_value=0.0,
-        max_value=1.0,
-        value=0.1,
-        step=0.05,
-        help="類似ユーザーとして認識する最小類似度"
     )
     
     # レコメンダーを読み込み
@@ -580,7 +570,7 @@ def main():
         
         # 類似ユーザー情報を表示
         st.subheader("🤝 類似ユーザー")
-        similar_users = recommender.get_similar_users(user_id, 5, min_similarity_threshold)
+        similar_users = recommender.get_similar_users(user_id, 5)
         
         if similar_users:
             similar_users_df = pl.DataFrame(
@@ -603,16 +593,14 @@ def main():
             user_based_recommendations = recommender.get_recommendations(
                 user_id, 
                 n_recommendations,
-                n_similar_users=n_similar_users,
-                min_similarity_threshold=min_similarity_threshold
+                n_similar_users=n_similar_users
             )
         
         # 推薦理由を取得
         reason_info = get_user_based_recommendation_reason(
             recommender, 
             user_id, 
-            n_similar_users, 
-            min_similarity_threshold
+            n_similar_users
         )
         
         display_user_based_recommendations_with_reasons(
@@ -626,8 +614,7 @@ def main():
         st.info(
             f"**ユーザーベース推薦設定**:\n\n"
             f"- Alpha値: {alpha}\n"
-            f"- 類似ユーザー数: {n_similar_users}人\n"
-            f"- 最小類似度閾値: {min_similarity_threshold}\n\n"
+            f"- 類似ユーザー数: {n_similar_users}人\n\n"
             f"**推薦理由**: ALSのuser_factorsから計算した類似度に基づき、あなたと最も類似したユーザーが聞いているアーティストの中から、あなたがまだ聞いていないアーティストを推薦"
         )
     
