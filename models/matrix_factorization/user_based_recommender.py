@@ -47,7 +47,7 @@ class UserBasedRecommender(BaseRecommender):
     
     def get_inference_param_names(self) -> List[str]:
         """推論パラメータ名のリストを返す"""
-        return ["n_similar_users", "min_similarity_threshold"]
+        return ["n_similar_users"]
     
     def validate_params(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """パラメータの検証とデフォルト値設定"""
@@ -61,7 +61,6 @@ class UserBasedRecommender(BaseRecommender):
         
         # 推論パラメータのデフォルト値設定
         validated.setdefault('n_similar_users', 10)
-        validated.setdefault('min_similarity_threshold', 0.1)
         
         # 値の範囲チェック
         if validated['alpha'] < 0:
@@ -74,8 +73,6 @@ class UserBasedRecommender(BaseRecommender):
             raise ValueError("iterationsは正の整数である必要があります")
         if validated['n_similar_users'] < 1:
             raise ValueError("n_similar_usersは1以上である必要があります")
-        if not 0 <= validated['min_similarity_threshold'] <= 1:
-            raise ValueError("min_similarity_thresholdは0から1の間である必要があります")
             
         return validated
         
@@ -165,8 +162,7 @@ class UserBasedRecommender(BaseRecommender):
     def get_similar_users(
         self, 
         user_id: int, 
-        n_similar_users: int = 10,
-        min_similarity_threshold: float = 0.1
+        n_similar_users: int = 10
     ) -> List[Tuple[int, float]]:
         """
         指定ユーザーに類似したユーザーを取得
@@ -174,7 +170,6 @@ class UserBasedRecommender(BaseRecommender):
         Args:
             user_id: 対象ユーザーID
             n_similar_users: 類似ユーザー数
-            min_similarity_threshold: 最小類似度閾値
             
         Returns:
             類似ユーザーのリスト [(user_id, similarity), ...]
@@ -186,24 +181,19 @@ class UserBasedRecommender(BaseRecommender):
             return []
             
         user_idx = self.user_to_idx[user_id]
-        similarities = self.user_similarity_matrix[user_idx]
+        similarities = self.user_similarity_matrix[user_idx].copy()
         
         # 自分自身を除外
         similarities[user_idx] = -1.0
         
-        # 類似度でソート
-        sorted_indices = np.argsort(similarities)[::-1]
+        # 効率的な上位k件取得
+        unsorted_max_indices = np.argpartition(-similarities, n_similar_users)[:n_similar_users]
+        y = similarities[unsorted_max_indices]
+        indices = np.argsort(-y)
+        max_k_indices = unsorted_max_indices[indices]
         
-        similar_users = []
-        for idx in sorted_indices:
-            similarity = similarities[idx]
-            if similarity >= min_similarity_threshold and len(similar_users) < n_similar_users:
-                similar_user_id = self.idx_to_user[idx]
-                similar_users.append((similar_user_id, float(similarity)))
-            elif similarity < min_similarity_threshold:
-                break
-                
-        return similar_users
+        # 結果作成
+        return [(self.idx_to_user[idx], float(similarities[idx])) for idx in max_k_indices]
     
     def get_common_artists(self, user_id1: int, user_id2: int, top_n: int = 10) -> List[Tuple[str, int, int]]:
         """
@@ -255,7 +245,6 @@ class UserBasedRecommender(BaseRecommender):
             n_recommendations: 推薦数
             **kwargs: 推論パラメータ
                 n_similar_users: 類似ユーザー数 (デフォルト: 10)
-                min_similarity_threshold: 最小類似度閾値 (デフォルト: 0.1)
                 
         Returns:
             推薦アイテムのリスト（アイテム名、スコア）のタプル
@@ -266,7 +255,6 @@ class UserBasedRecommender(BaseRecommender):
             
         # パラメータのデフォルト値設定
         n_similar_users = kwargs.get('n_similar_users', 10)
-        min_similarity_threshold = kwargs.get('min_similarity_threshold', 0.1)
         
         if user_id not in self.user_to_idx:
             return f"ユーザー {user_id} がデータセットに見つかりません"
@@ -275,7 +263,7 @@ class UserBasedRecommender(BaseRecommender):
         user_listened_artists = set(self.df.filter(pl.col('user_id') == user_id)['artist'].to_list())
         
         # 類似ユーザーを取得
-        similar_users = self.get_similar_users(user_id, n_similar_users, min_similarity_threshold)
+        similar_users = self.get_similar_users(user_id, n_similar_users)
         
         if not similar_users:
             return "類似ユーザーが見つかりません"
@@ -393,8 +381,6 @@ def main():
                         help='イテレーション数 (デフォルト: 20)')
     parser.add_argument('--n-similar-users', type=int, default=10,
                         help='類似ユーザー数 (デフォルト: 10)')
-    parser.add_argument('--min-similarity-threshold', type=float, default=0.1,
-                        help='最小類似度閾値 (デフォルト: 0.1)')
     parser.add_argument('--user-id', type=int, default=1,
                         help='推薦テスト用のユーザーID (デフォルト: 1)')
     parser.add_argument('--n-recommendations', type=int, default=5,
@@ -453,8 +439,7 @@ def main():
     print(f"\nユーザー {args.user_id} の類似ユーザー:")
     similar_users = recommender.get_similar_users(
         args.user_id, 
-        args.n_similar_users, 
-        args.min_similarity_threshold
+        args.n_similar_users
     )
     for similar_user_id, similarity in similar_users[:5]:  # 上位5人を表示
         print(f"  ユーザー {similar_user_id}: 類似度 {similarity:.3f}")
@@ -463,8 +448,7 @@ def main():
     recommendations = recommender.get_recommendations(
         args.user_id, 
         args.n_recommendations,
-        n_similar_users=args.n_similar_users,
-        min_similarity_threshold=args.min_similarity_threshold
+        n_similar_users=args.n_similar_users
     )
     
     if isinstance(recommendations, str):
