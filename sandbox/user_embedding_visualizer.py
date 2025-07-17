@@ -221,9 +221,30 @@ def display_user_comparison(recommender: MusicRecommenderMMR, user_id1: int, use
             common_list = list(common_artists)[:10]  # 上位10個
             st.write(", ".join(common_list))
 
+# コールバック関数の定義
+def on_user_id1_change():
+    """ユーザーID1選択変更時のコールバック関数"""
+    if 'user_id1_selectbox' in st.session_state:
+        st.session_state.selected_user_id1 = st.session_state.user_id1_selectbox
+
+def on_user_id2_change():
+    """ユーザーID2選択変更時のコールバック関数"""
+    if 'user_id2_selectbox' in st.session_state:
+        st.session_state.selected_user_id2 = st.session_state.user_id2_selectbox
+
 def main():
     st.title("👥 User Embedding Visualizer")
     st.markdown("**ALSユーザーファクターの2次元可視化**")
+    
+    # セッション状態の初期化（Windows環境対応）
+    session_defaults = {
+        'selected_user_id1': None,
+        'selected_user_id2': None
+    }
+    
+    for key, default_value in session_defaults.items():
+        if key not in st.session_state:
+            st.session_state[key] = default_value
     
     # サイドバー設定
     st.sidebar.header("設定")
