@@ -17,6 +17,7 @@ CSV Data → Polars DataFrame → ALS Training → Model (cached in weights/) �
 #### 1. **Recommendation Models** (`models/matrix_factorization/`)
 - **MusicRecommender**: Base collaborative filtering using Implicit ALS
 - **MusicRecommenderMMR**: Extended with MMR (Maximal Marginal Relevance) for diversity
+- **UserBasedRecommender**: User-based collaborative filtering using ALS user_factors for similarity
 - **BaseRecommender**: Abstract base class with common functionality
 
 #### 2. **Evaluation System** (`src/evaluation/`)
@@ -25,11 +26,21 @@ CSV Data → Polars DataFrame → ALS Training → Model (cached in weights/) �
 - **TimeSeriesDataSplitter**: Splits data chronologically for realistic evaluation
 - **ResultsManager**: Handles CSV-based result persistence with duplicate detection
 
-#### 3. **Streamlit Application** (`app.py`)
+#### 3. **Streamlit Applications**
+- **`app.py`**: Main item-based recommendation interface with MMR
+- **`app_rec-reason.py`**: Item-based recommendations with similarity-based reasoning
+- **`app_user-base_rec-reason.py`**: User-based recommendations with user similarity reasoning
 - Interactive web interface with user search (ID or artist-based)
 - Real-time MMR parameter adjustment (λ: 0=diversity, 1=relevance)
 - Demographic filtering (gender/age) and side-by-side recommendation comparison
 - **Critical**: Uses callback functions (`on_change`) instead of forms for cross-platform stability
+
+#### 4. **Visualization Tools** (`sandbox/`)
+- **`artist_embedding_visualizer.py`**: 2D visualization of artist embeddings (item_factors)
+- **`user_embedding_visualizer.py`**: 2D visualization of user embeddings (user_factors)
+- t-SNE and UMAP dimensionality reduction
+- Interactive Plotly charts with hover information
+- User similarity validation through listening history comparison
 
 ### Data Schema
 CSV files must follow this structure:
@@ -43,7 +54,7 @@ user_id,artist,play_count,gender,age,interaction_date,genre
 ### Environment Setup
 ```bash
 # Install dependencies (uv recommended)
-uv add polars implicit scikit-learn streamlit
+uv add polars implicit scikit-learn streamlit plotly umap-learn
 
 # Generate sample data
 python data_generator.py
@@ -51,8 +62,15 @@ python data_generator.py
 
 ### Running Applications
 ```bash
-# Start Streamlit web interface
-uv run streamlit run app.py
+# Start Streamlit web interfaces
+uv run streamlit run app.py                          # Main item-based recommendation
+uv run streamlit run app_rec-reason.py               # Item-based with reasoning
+uv run streamlit run app_user-base_rec-reason.py     # User-based with reasoning
+
+# Visualization tools (sandbox)
+cd sandbox
+uv run streamlit run artist_embedding_visualizer.py  # Artist embeddings visualization
+uv run streamlit run user_embedding_visualizer.py    # User embeddings visualization
 
 # Evaluate models with custom parameters
 python evaluate_models.py --csv-path data/user_artist_plays.csv --k 5
@@ -64,6 +82,7 @@ python evaluate_models.py --show-best
 
 # Run individual models
 python models/matrix_factorization/music_recommender_mmr.py --csv-path data/user_artist_plays.csv --user-id 1 --lambda-param 0.5
+python models/matrix_factorization/user_based_recommender.py --csv-path data/user_artist_plays.csv --user-id 1 --n-similar-users 10
 ```
 
 ### Testing & Quality Assurance
@@ -106,6 +125,19 @@ head results/evaluation_results.csv
 - Candidate pool size affects diversity vs computation trade-off
 - Optimal λ=0.7 found through extensive evaluation
 
+### User-Based Collaborative Filtering
+- Uses ALS user_factors for computing user similarity (cosine similarity)
+- Efficient top-k user retrieval with `np.argpartition()` (O(n + k log k))
+- No similarity threshold - always returns top-k most similar users
+- Recommendation scoring: similarity × play_count aggregated across similar users
+- File format: `{dataset_name}_user_based_alpha_{alpha_value}.pkl`
+
+### Recommendation Reasoning
+- **Item-based reasoning**: Shows most similar artist from user's listening history
+- **User-based reasoning**: Shows most similar user and common listening patterns
+- **Similarity computation**: Cosine similarity on ALS-generated embeddings
+- **Evidence display**: Top 3 common artists between target and similar users
+
 ## Performance Optimization
 
 ### Large Dataset Handling
@@ -125,6 +157,32 @@ Current optimal settings from evaluation:
   "lambda_param": 0.7
 }
 ```
+
+## Visualization & Analysis Tools
+
+### Sandbox Environment (`sandbox/`)
+Dedicated space for embedding analysis and visualization experiments.
+
+### Artist Embedding Visualization
+- **Purpose**: Visualize ALS item_factors in 2D space
+- **Methods**: t-SNE and UMAP dimensionality reduction
+- **Color coding**: By genre (artist-genre mapping from data)
+- **Interactive features**: Hover for artist details, genre distribution charts
+- **Insights**: Cluster formation, genre relationships, embedding quality assessment
+
+### User Embedding Visualization  
+- **Purpose**: Visualize ALS user_factors in 2D space
+- **Methods**: t-SNE and UMAP dimensionality reduction
+- **User comparison**: Side-by-side listening history analysis
+- **Validation**: Compare graph proximity with actual listening similarity
+- **Metrics**: Jaccard similarity, common artists/genres count
+- **Use cases**: Embedding space validation, user cluster analysis
+
+### Visualization Parameters
+- **t-SNE**: Perplexity (5-50), preserves local neighborhoods
+- **UMAP**: N neighbors (5-50), Min distance (0.01-1.0), faster and more stable
+- **Caching**: `@st.cache_data` for expensive computations
+- **Performance**: Handles large embedding matrices efficiently
 
 ## Streamlit Widget State Management Patterns
 
