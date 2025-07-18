@@ -1,11 +1,28 @@
 import pandas as pd
 import numpy as np
 import datetime
+import hashlib
 from typing import Dict, List
+
+def generate_hash_user_id(user_index: int) -> str:
+    """
+    整数のユーザーインデックスからハッシュ化されたユーザーIDを生成
+    
+    Args:
+        user_index: ユーザーのインデックス（1から開始）
+        
+    Returns:
+        str: ハッシュ化されたユーザーID（8文字）
+    """
+    # ユーザーインデックスを文字列化してハッシュ化
+    user_str = f"user_{user_index}"
+    hash_object = hashlib.sha256(user_str.encode())
+    # 最初の8文字を使用（可読性のため）
+    return hash_object.hexdigest()[:8]
 
 def generate_sample_data() -> pd.DataFrame:
     """
-    音楽推薦システム用のサンプルデータを生成
+    音楽推薦システム用のサンプルデータを生成（ハッシュ化されたユーザーID使用）
     
     Returns:
         pd.DataFrame: ユーザー-アーティスト再生データ
@@ -48,9 +65,11 @@ def generate_sample_data() -> pd.DataFrame:
         "40-44", "45-49", "50-54", "55-59", "60-64", "65-70"
     ]
     
-    # ユーザーごとの人口統計学的属性を生成
-    user_demographics: Dict[int, Dict[str, str]] = {}
-    for user_id in range(1, n_users + 1):
+    # ユーザーごとの人口統計学的属性を生成（ハッシュ化されたID使用）
+    user_demographics: Dict[str, Dict[str, str]] = {}
+    for user_index in range(1, n_users + 1):
+        user_id = generate_hash_user_id(user_index)
+        
         # 性別を生成（男性、女性、その他の分布）
         gender: str = np.random.choice(['Male', 'Female', 'Other'], p=[0.48, 0.48, 0.04])
         
@@ -59,8 +78,8 @@ def generate_sample_data() -> pd.DataFrame:
         
         user_demographics[user_id] = {'gender': gender, 'age': age_category}
     
-    # 再生記録データのリストを初期化
-    user_ids: List[int] = []
+    # 再生記録データのリストを初期化（ハッシュ化されたID使用）
+    user_ids: List[str] = []
     artist_names: List[str] = []
     play_counts: List[int] = []
     genders: List[str] = []
@@ -73,7 +92,9 @@ def generate_sample_data() -> pd.DataFrame:
     end_date: datetime.date = datetime.date(2024, 12, 31)
     
     # 各ユーザーが聴くアーティスト数とその再生記録を生成
-    for user_id in range(1, n_users + 1):
+    for user_index in range(1, n_users + 1):
+        user_id = generate_hash_user_id(user_index)
+        
         # 各ユーザーが聴くアーティスト数（5-15個）
         n_artists_listened: int = np.random.randint(5, 16)
         selected_artists: np.ndarray = np.random.choice(artists, size=n_artists_listened, replace=False)
