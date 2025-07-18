@@ -139,7 +139,7 @@ def get_demographics_info(df):
 
 def get_recommendation_reasons(
     recommender: MusicRecommenderMMR, 
-    user_id: int, 
+    user_id, 
     recommended_artists: List[str]
 ) -> List[Tuple[str, str, float]]:
     """

@@ -138,9 +138,9 @@ def get_demographics_info(df):
 
 def get_user_based_recommendation_reason(
     recommender: UserBasedRecommender, 
-    user_id: int,
+    user_id,
     n_similar_users: int = 5
-) -> Tuple[Optional[Tuple[int, float]], List[Tuple[str, int, int]]]:
+) -> Tuple[Optional[Tuple[str, float]], List[Tuple[str, int, int]]]:
     """
     ユーザーベース推薦の理由を取得する関数
     
@@ -170,7 +170,7 @@ def get_user_based_recommendation_reason(
 
 def display_user_based_recommendations_with_reasons(
     recommendations: List[Tuple[str, float]], 
-    reason_info: Tuple[Optional[Tuple[int, float]], List[Tuple[str, int, int]]],
+    reason_info: Tuple[Optional[Tuple[str, float]], List[Tuple[str, int, int]]],
     title: str, 
     description: str = ""
 ):

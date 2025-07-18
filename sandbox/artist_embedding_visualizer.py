@@ -141,6 +141,10 @@ def main():
     st.title("🎨 Artist Embedding Visualizer")
     st.markdown("**ALSアイテムファクターの2次元可視化 - ジャンル別色分け**")
     
+    # セッション状態の初期化（クリック選択機能）
+    if 'plot_selected_artist' not in st.session_state:
+        st.session_state.plot_selected_artist = None
+    
     # サイドバー設定
     st.sidebar.header("設定")
     
