@@ -246,3 +246,4 @@ def on_gender_change():
 index = options.index(st.session_state.selected_gender) if st.session_state.selected_gender in options else 0
 selected_gender = st.selectbox("Gender:", options, index=index, key="gender_selectbox", on_change=on_gender_change)
 ```
+ - to memorize
