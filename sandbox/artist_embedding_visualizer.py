@@ -114,6 +114,19 @@ def create_interactive_plot(
         st.write("**最初の5個の詳細情報:**")
         for i in range(min(5, len(artist_names))):
             st.write(f"Index {i}: {artist_names[i]} → {genres[i]} → Embedding({embeddings[i, 0]:.3f}, {embeddings[i, 1]:.3f})")
+        
+        # DataFrameの作成前後での順序確認
+        st.write("**DataFrame作成前の順序確認:**")
+        st.write("Artist names[:5]:", artist_names[:5])
+        st.write("Genres[:5]:", genres[:5])
+        
+        # DataFrame作成後の順序確認
+        st.write("**DataFrame作成後の順序確認:**")
+        st.write("df_plot.head():")
+        st.dataframe(df_plot.head(), use_container_width=True)
+    
+    # Plotlyの内部ソートを防ぐため、categoricalにして順序を固定
+    df_plot['genre'] = pd.Categorical(df_plot['genre'], categories=df_plot['genre'].unique(), ordered=True)
     
     # ジャンルごとの色分け
     fig = px.scatter(
@@ -125,8 +138,23 @@ def create_interactive_plot(
         title=title,
         labels={'x': 'Dimension 1', 'y': 'Dimension 2'},
         width=800,
-        height=600
+        height=600,
+        category_orders={'genre': df_plot['genre'].cat.categories.tolist()}  # 順序を明示的に指定
     )
+    
+    # デバッグ情報: Plotly作成後の確認
+    if debug_mode:
+        st.write("**Plotly作成後のトレース確認:**")
+        for i, trace in enumerate(fig.data):
+            if hasattr(trace, 'name') and hasattr(trace, 'x') and len(trace.x) > 0:
+                st.write(f"Trace {i} (Genre: {trace.name}): First point at ({trace.x[0]:.3f}, {trace.y[0]:.3f})")
+                # 対応するDataFrameの行を探す
+                matching_rows = df_plot[(df_plot['x'] == trace.x[0]) & (df_plot['y'] == trace.y[0])]
+                if len(matching_rows) > 0:
+                    row = matching_rows.iloc[0]
+                    st.write(f"  → DataFrame: {row['artist']} (idx: {row['index']})")
+                else:
+                    st.write(f"  → DataFrame: No matching row found")
     
     # ホバー情報をカスタマイズ（インデックスも表示）
     fig.update_traces(
