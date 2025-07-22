@@ -49,9 +49,10 @@ def load_model_and_data(csv_path: str, alpha: float):
 def get_artist_genre_mapping(df: pl.DataFrame) -> Dict[str, str]:
     """アーティストとジャンルのマッピングを取得"""
     # アーティストとジャンルは一対一で紐づくので、各アーティストの最初のジャンルを取得
+    # ソートして順序を保証
     artist_genre = df.group_by('artist').agg(
         pl.col('genre').first().alias('genre')
-    )
+    ).sort('artist')
     
     return dict(zip(artist_genre['artist'].to_list(), artist_genre['genre'].to_list()))
 
@@ -207,6 +208,18 @@ def main():
             genre = artist_genre_mapping.get(artist, "Unknown")
             artist_names.append(artist)
             genres.append(genre)
+        
+        # デバッグ情報: 最初の10個のアーティスト-ジャンル対応を表示
+        if st.sidebar.checkbox("デバッグ情報を表示", value=False):
+            st.sidebar.subheader("🔍 アーティスト-ジャンル対応 (最初の10個)")
+            debug_data = []
+            for i in range(min(10, len(artist_names))):
+                debug_data.append({
+                    "Index": i,
+                    "Artist": artist_names[i],
+                    "Genre": genres[i]
+                })
+            st.sidebar.dataframe(pd.DataFrame(debug_data), use_container_width=True, hide_index=True)
         
         # ジャンル統計表示
         st.subheader("🎵 ジャンル分布")
