@@ -89,7 +89,8 @@ def create_interactive_plot(
     embeddings: np.ndarray,
     artist_names: List[str],
     genres: List[str],
-    title: str
+    title: str,
+    debug_mode: bool = False
 ) -> go.Figure:
     """インタラクティブな散布図を作成"""
     
@@ -98,8 +99,21 @@ def create_interactive_plot(
         'x': embeddings[:, 0],
         'y': embeddings[:, 1],
         'artist': artist_names,
-        'genre': genres
+        'genre': genres,
+        'index': range(len(artist_names))  # デバッグ用インデックス
     })
+    
+    # デバッグモード時の詳細情報出力
+    if debug_mode:
+        st.write("🔍 **プロット作成デバッグ情報**")
+        st.write(f"Embeddings shape: {embeddings.shape}")
+        st.write(f"Artist names length: {len(artist_names)}")
+        st.write(f"Genres length: {len(genres)}")
+        
+        # 最初の5個の詳細情報
+        st.write("**最初の5個の詳細情報:**")
+        for i in range(min(5, len(artist_names))):
+            st.write(f"Index {i}: {artist_names[i]} → {genres[i]} → Embedding({embeddings[i, 0]:.3f}, {embeddings[i, 1]:.3f})")
     
     # ジャンルごとの色分け
     fig = px.scatter(
@@ -107,20 +121,20 @@ def create_interactive_plot(
         x='x',
         y='y',
         color='genre',
-        hover_data=['artist'],
+        hover_data=['artist', 'index'],
         title=title,
         labels={'x': 'Dimension 1', 'y': 'Dimension 2'},
         width=800,
         height=600
     )
     
-    # ホバー情報をカスタマイズ
+    # ホバー情報をカスタマイズ（インデックスも表示）
     fig.update_traces(
-        hovertemplate='<b>%{customdata[0]}</b><br>' +
+        hovertemplate='<b>%{customdata[0]}</b> (idx: %{customdata[1]})<br>' +
                       'Genre: %{marker.color}<br>' +
                       'X: %{x:.3f}<br>' +
                       'Y: %{y:.3f}<extra></extra>',
-        customdata=df_plot[['artist']].values
+        customdata=df_plot[['artist', 'index']].values
     )
     
     # レイアウトを調整
@@ -153,6 +167,9 @@ def main():
     default_csv_path = os.path.join(parent_dir, "data", "user_artist_plays.csv")
     csv_path = st.sidebar.text_input("CSVファイルパス", value=default_csv_path)
     alpha = st.sidebar.slider("Alpha値", min_value=0.1, max_value=2.0, value=0.4, step=0.1)
+    
+    # デバッグモード設定
+    debug_mode = st.sidebar.checkbox("プロット作成デバッグモード", value=False)
     
     # 次元圧縮手法の選択
     reduction_method = st.sidebar.selectbox(
@@ -209,9 +226,17 @@ def main():
             artist_names.append(artist)
             genres.append(genre)
         
-        # デバッグ情報: 最初の10個のアーティスト-ジャンル対応を表示
+        # デバッグ情報: 詳細な対応関係を検証
         if st.sidebar.checkbox("デバッグ情報を表示", value=False):
-            st.sidebar.subheader("🔍 アーティスト-ジャンル対応 (最初の10個)")
+            st.sidebar.subheader("🔍 詳細デバッグ情報")
+            
+            # 基本情報
+            st.sidebar.write(f"🔢 Item factors shape: {recommender.model.item_factors.shape}")
+            st.sidebar.write(f"📊 Artist count: {len(artist_names)}")
+            st.sidebar.write(f"🎵 Genre count: {len(set(genres))}")
+            
+            # アーティスト-ジャンル対応 (最初の10個)
+            st.sidebar.subheader("📋 idx_to_artist → genre mapping")
             debug_data = []
             for i in range(min(10, len(artist_names))):
                 debug_data.append({
@@ -221,10 +246,44 @@ def main():
                 })
             st.sidebar.dataframe(pd.DataFrame(debug_data), use_container_width=True, hide_index=True)
             
-            # embedding shape情報も表示
-            st.sidebar.write(f"🔢 Item factors shape: {recommender.model.item_factors.shape}")
-            st.sidebar.write(f"📊 Artist count: {len(artist_names)}")
-            st.sidebar.write(f"🎵 Genre count: {len(set(genres))}")
+            # CSVから直接取得したアーティスト-ジャンルマッピング
+            st.sidebar.subheader("📁 CSV直接マッピング (ソート済み)")
+            csv_mapping_data = []
+            sorted_mapping = sorted(artist_genre_mapping.items())[:10]
+            for i, (artist, genre) in enumerate(sorted_mapping):
+                csv_mapping_data.append({
+                    "CSV_Order": i,
+                    "Artist": artist,
+                    "Genre": genre
+                })
+            st.sidebar.dataframe(pd.DataFrame(csv_mapping_data), use_container_width=True, hide_index=True)
+            
+            # 実際のCSVでの最初の出現順序
+            st.sidebar.subheader("📄 CSV最初出現順序")
+            csv_first_appearance = recommender.df.select(['artist', 'genre']).unique(maintain_order=True)
+            csv_appear_data = []
+            for i in range(min(10, len(csv_first_appearance))):
+                row = csv_first_appearance.row(i)
+                csv_appear_data.append({
+                    "CSV_Index": i,
+                    "Artist": row[0],
+                    "Genre": row[1]
+                })
+            st.sidebar.dataframe(pd.DataFrame(csv_appear_data), use_container_width=True, hide_index=True)
+            
+            # artist_to_idxの検証
+            st.sidebar.subheader("🔗 artist_to_idx検証")
+            artist_to_idx_data = []
+            for artist in list(recommender.artist_to_idx.keys())[:10]:
+                idx = recommender.artist_to_idx[artist]
+                reverse_artist = recommender.idx_to_artist[idx]
+                artist_to_idx_data.append({
+                    "Artist": artist,
+                    "→ Index": idx,
+                    "Index → Artist": reverse_artist,
+                    "Match": "✓" if artist == reverse_artist else "✗"
+                })
+            st.sidebar.dataframe(pd.DataFrame(artist_to_idx_data), use_container_width=True, hide_index=True)
         
         # ジャンル統計表示
         st.subheader("🎵 ジャンル分布")
@@ -266,7 +325,8 @@ def main():
                 tsne_embeddings,
                 artist_names,
                 genres,
-                f"t-SNE Artist Embeddings (perplexity={tsne_perplexity})"
+                f"t-SNE Artist Embeddings (perplexity={tsne_perplexity})",
+                debug_mode=debug_mode
             )
             st.plotly_chart(fig_tsne, use_container_width=True)
             
@@ -283,7 +343,8 @@ def main():
                 umap_embeddings,
                 artist_names,
                 genres,
-                f"UMAP Artist Embeddings (neighbors={umap_n_neighbors}, min_dist={umap_min_dist})"
+                f"UMAP Artist Embeddings (neighbors={umap_n_neighbors}, min_dist={umap_min_dist})",
+                debug_mode=debug_mode
             )
             st.plotly_chart(fig_umap, use_container_width=True)
             
@@ -302,7 +363,8 @@ def main():
                     tsne_embeddings,
                     artist_names,
                     genres,
-                    f"t-SNE (perplexity={tsne_perplexity})"
+                    f"t-SNE (perplexity={tsne_perplexity})",
+                    debug_mode=debug_mode
                 )
                 st.plotly_chart(fig_tsne, use_container_width=True)
             
@@ -319,7 +381,8 @@ def main():
                     umap_embeddings,
                     artist_names,
                     genres,
-                    f"UMAP (neighbors={umap_n_neighbors})"
+                    f"UMAP (neighbors={umap_n_neighbors})",
+                    debug_mode=debug_mode
                 )
                 st.plotly_chart(fig_umap, use_container_width=True)
         
