@@ -220,6 +220,11 @@ def main():
                     "Genre": genres[i]
                 })
             st.sidebar.dataframe(pd.DataFrame(debug_data), use_container_width=True, hide_index=True)
+            
+            # embedding shape情報も表示
+            st.sidebar.write(f"🔢 Item factors shape: {recommender.model.item_factors.shape}")
+            st.sidebar.write(f"📊 Artist count: {len(artist_names)}")
+            st.sidebar.write(f"🎵 Genre count: {len(set(genres))}")
         
         # ジャンル統計表示
         st.subheader("🎵 ジャンル分布")

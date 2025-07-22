@@ -93,7 +93,7 @@ class MusicRecommenderMMR(BaseRecommender):
         
         # ユーザーとアーティストのマッピングを作成
         unique_users: List[int] = self.df['user_id'].unique().to_list()
-        unique_artists: List[str] = self.df['artist'].unique().to_list()
+        unique_artists: List[str] = self.df.select('artist').unique(maintain_order=True).to_series().to_list()
         
         self.user_to_idx = {user: idx for idx, user in enumerate(unique_users)}
         self.idx_to_user = {idx: user for user, idx in self.user_to_idx.items()}
